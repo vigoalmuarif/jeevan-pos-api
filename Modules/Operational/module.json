@@ -1,0 +1,11 @@
+{
+    "name": "Operational",
+    "alias": "operational",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Operational\\Providers\\OperationalServiceProvider"
+    ],
+    "files": []
+}

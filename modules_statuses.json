@@ -1,0 +1,10 @@
+{
+    "User": true,
+    "Merchant": true,
+    "Operational": true,
+    "Permission": true,
+    "Core": true,
+    "Auth": true,
+    "Product": true,
+    "Inventory": true
+}
