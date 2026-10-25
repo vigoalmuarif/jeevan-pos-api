@@ -21,10 +21,11 @@ class CategoryService extends BaseService
         $config = new DataTableConfig(
             allowedFilters: [
                 AllowedFilter::exact('name'),
+                AllowedFilter::exact('code'),
                 AllowedFilter::exact('is_active'),
             ],
-            allowedSorts: ['name', 'created_at'],
-            searchableColumns: ['name'],
+            allowedSorts: ['name', 'code', 'created_at'],
+            searchableColumns: ['name', 'code'],
             defaultSort: '-created_at',
         );
 
@@ -37,6 +38,7 @@ class CategoryService extends BaseService
 
         $category = $this->model::create([
             'name' => $data['name'],
+            'code' => Str::upper(trim($data['code'])),
             'slug' => Str::slug($data['name']),
             'merchant_id' => $is_merchant  ? MerchantContext::id() : null,
             'description' => $data['description'] ?? null,
@@ -51,10 +53,11 @@ class CategoryService extends BaseService
         $is_merchant = auth()->guard('merchant')->check();
 
         $category->name = $data['name'];
+        $category->code = Str::upper(trim($data['code']));
         $category->slug = Str::slug($data['name']);
-        $category->merchant_id = $is_merchant ? MerchantContext::id() : null;
-        $category->description = $data['description'];
-        $category->is_active = isset($data['is_active']) ? $data['is_active'] : true;
+        $category->merchant_id = $is_merchant ? MerchantContext::id() : $category->merchant_id;
+        $category->description = $data['description'] ?? null;
+        $category->is_active = $data['is_active'] ?? $category->is_active;
         $category->save();
 
         return $category;

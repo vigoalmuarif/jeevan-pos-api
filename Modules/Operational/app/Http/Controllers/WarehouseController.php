@@ -7,7 +7,6 @@ use Illuminate\Http\Request;
 use Modules\Operational\Http\Requests\StoreWarehouseRequest;
 use Modules\Operational\Http\Requests\UpdateWarehouseRequest;
 use Modules\Operational\Transformers\WarehouseResource;
-use Modules\Operational\Models\Branch;
 use Modules\Operational\Models\Warehouse;
 use Modules\Operational\Services\WarehouseService;
 use Modules\Core\Abstracts\BaseController;
@@ -27,33 +26,31 @@ class WarehouseController extends BaseController
         );
     }
 
+    public function forComboBox(): JsonResponse
+    {
+        return $this->success($this->warehouseService->getOptions());
+    }
+
     public function store(
-        StoreWarehouseRequest $request,
-        ?Branch $branch
+        StoreWarehouseRequest $request
     ): JsonResponse {
         $warehouse = $this->warehouseService->create(
-            $branch,
             $request->validated()
         );
 
         return $this->created(new WarehouseResource($warehouse));
     }
 
-    public function edit(
-        ?Branch $branch,
-        ?Warehouse $warehouse
-    ): JsonResponse {
-
+    public function edit(Warehouse $warehouse): JsonResponse {
         return $this->success(
             new WarehouseResource(
-                $warehouse->load('branch:id,code,name')
+                $warehouse->load(['branches:id,code,name', 'regions:id,name,code,type'])
             )
         );
     }
 
     public function update(
         UpdateWarehouseRequest $request,
-        Branch $branch,
         Warehouse $warehouse
     ): JsonResponse {
         $warehouse = $this->warehouseService->update(
@@ -64,10 +61,7 @@ class WarehouseController extends BaseController
         return $this->success(new WarehouseResource($warehouse));
     }
 
-    public function destroy(
-        Branch $branch,
-        Warehouse $warehouse
-    ): JsonResponse {
+    public function destroy(Warehouse $warehouse): JsonResponse {
         $this->warehouseService->delete($warehouse);
 
         return $this->noContent();

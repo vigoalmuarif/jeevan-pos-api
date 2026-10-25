@@ -13,7 +13,6 @@ class WarehouseIndexRequest extends FormRequest
     {
          return array_merge(parent::rules(), [
             'filter.is_active' => ['sometimes', 'integer'],
-            'filter.is_main' => ['sometimes', 'integer'],
             'filter.branch_id' => ['sometimes', 'integer'],
         ]);
     }

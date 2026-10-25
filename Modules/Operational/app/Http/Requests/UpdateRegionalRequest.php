@@ -3,6 +3,8 @@
 namespace Modules\Operational\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Core\Helpers\MerchantContext;
 
 class UpdateRegionalRequest extends FormRequest
 {
@@ -11,7 +13,25 @@ class UpdateRegionalRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        $merchantId = MerchantContext::id();
+        $region = $this->route('regional');
+
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('regions', 'code')->where('merchant_id', $merchantId)->ignore($region?->id),
+            ],
+            'type' => ['required', Rule::in(['province', 'city', 'custom'])],
+            'parent_region_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('regions', 'id')->where('merchant_id', $merchantId),
+            ],
+            'is_active' => ['sometimes', 'boolean'],
+        ];
     }
 
     /**

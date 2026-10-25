@@ -24,6 +24,11 @@ Route::middleware([
     // Regional
     Route::prefix('regions')->group(function () {
         Route::get(
+            '/simple/combobox',
+            [RegionController::class, 'options']
+        )->middleware('role_or_permission:owner|core.regional.view|core.regional.create|core.regional.update|core.branch.create|core.branch.update|core.warehouse.create|core.warehouse.update');
+
+        Route::get(
             '/',
             [RegionController::class, 'index']
         )->middleware('role_or_permission:owner|core.regional.view');
@@ -33,14 +38,19 @@ Route::middleware([
             [RegionController::class, 'store']
         )->middleware('role_or_permission:owner|core.regional.create');
 
-        Route::get(
-            '/{regional:slug}/edit',
-            [RegionController::class, 'edit']
-        )->middleware('role_or_permission:owner|core.regional.update');
-        
         Route::patch(
-            '/{regional:slug}',
+            '/{regional}',
             [RegionController::class, 'update']
+        )->middleware('role_or_permission:owner|core.regional.update');
+
+        Route::delete(
+            '/{regional}',
+            [RegionController::class, 'destroy']
+        )->middleware('role_or_permission:owner|core.regional.delete');
+
+        Route::get(
+            '/{regional}/edit',
+            [RegionController::class, 'edit']
         )->middleware('role_or_permission:owner|core.regional.update');
     });
 
@@ -68,7 +78,7 @@ Route::middleware([
         Route::post(
             '/',
             [BranchController::class, 'store']
-        )->middleware('role_or_permission:owner|core.branch.q');
+        )->middleware('role_or_permission:owner|core.branch.create');
 
         Route::get(
             '/{branch:slug}/edit',
@@ -97,22 +107,6 @@ Route::middleware([
         });
 
 
-        Route::post(
-            '/{branch:slug}/warehouses',
-            [WarehouseController::class, 'store']
-        )->middleware('role_or_permission:owner|core.warehouse.create');
-
-        Route::put(
-            '/{branch:slug}/warehouses/{warehouse:slug}',
-            [WarehouseController::class, 'update']
-        )->middleware('role_or_permission:owner|core.warehouse.update');
-
-        Route::delete(
-            '/{branch:slug}/warehouses/{warehouse:slug}',
-            [WarehouseController::class, 'destroy']
-        )->middleware('role_or_permission:owner|core.warehouse.delete');
-
-
         // Tab endpoints
         Route::get('/{branch:slug}/operational', [BranchDetailController::class, 'operational']);
         Route::get('/{branch:slug}/resources', [BranchDetailController::class, 'resources']);
@@ -122,6 +116,11 @@ Route::middleware([
 
     // warehouses
     Route::prefix('warehouses')->group(function () {
+        Route::get(
+            '/simple/combobox',
+            [WarehouseController::class, 'forComboBox']
+        )->middleware('role_or_permission:owner|core.warehouse.view|core.branch.create|core.branch.update');
+
         Route::get(
             '/',
             [WarehouseController::class, 'index']
@@ -133,13 +132,18 @@ Route::middleware([
         )->middleware('role_or_permission:owner|core.warehouse.create');
 
         Route::get(
-            '/{warehouse:slug}/edit',
+            '/{warehouse}/edit',
             [WarehouseController::class, 'edit']
         )->middleware('role_or_permission:owner|core.warehouse.update');
         
         Route::patch(
-            '/{warehouse:slug}',
+            '/{warehouse}',
             [WarehouseController::class, 'update']
         )->middleware('role_or_permission:owner|core.warehouse.update');
+
+        Route::delete(
+            '/{warehouse}',
+            [WarehouseController::class, 'destroy']
+        )->middleware('role_or_permission:owner|core.warehouse.delete');
     });
 });

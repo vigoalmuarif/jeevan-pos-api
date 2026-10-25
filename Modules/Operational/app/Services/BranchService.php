@@ -2,7 +2,6 @@
 
 namespace Modules\Operational\Services;
 
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -13,8 +12,6 @@ use Modules\Core\Abstracts\BaseService;
 use Modules\Core\Helpers\MerchantContext;
 use Modules\Core\Support\DataTableConfig;
 use Modules\Core\Support\ServerSideTable;
-use Modules\Operational\Models\BranchWarehouse;
-use Modules\Operational\Models\Warehouse;
 use Spatie\QueryBuilder\AllowedFilter;
 
 class BranchService extends BaseService
@@ -28,7 +25,7 @@ class BranchService extends BaseService
                 'id',
                 'merchant_id',
                 'primary_warehouse_id',
-                'regions_id',
+                'region_id',
                 'code',
                 'name',
                 'email',
@@ -66,6 +63,7 @@ class BranchService extends BaseService
                 'code'            => strtoupper($data['code']),
                 'email'           => $data['email'] ?? null,
                 'phone'           => $data['phone'] ?? null,
+                'region_id'       => $data['region_id'],
                 'address'         => $data['address'] ?? null,
                 'village_code'    => $data['village_code'] ?? null,
                 'district_code'   => $data['district_code'] ?? null,
@@ -82,28 +80,9 @@ class BranchService extends BaseService
                 $this->setAsMain($branch);
             }
 
-            // Auto buat warehouse utama
-            $warehouse = Warehouse::create([
-                'merchant_id' => MerchantContext::id(),
-                'name'        => $isFirst ? 'Main Warehouse' : $data['warehouse_name'],
-                'code'        => $isFirst  ? 'WH-' . $branch->code : ($data['warehouse_code'] ?? 'WH-' . $branch->code),
-                'slug'        => Str::slug($data['name']),
-                'type'        => 'storage',
-                'address'     => isset($data['is_same_address']) && $data['is_same_address'] == "true"
-                                ? $data['address'] 
-                                : (isset($data['warehouse_address']) ? $data['warehouse_address'] : null),
-                'is_active'   => $data['is_active'],
-            ]);
+            $this->syncWarehouses($branch, $data['warehouse_ids']);
 
-           BranchWarehouse::create([
-                'branch_id' => $branch->id,
-                'warehouse_id' => $warehouse->id,
-                'merchant_id' => MerchantContext::id(),
-                'is_primary' => true,
-                'is_active' => true,
-            ]);
-
-            return $branch;
+            return $branch->load('warehouses');
         });
     }
 
@@ -116,6 +95,7 @@ class BranchService extends BaseService
                 'code'            => strtoupper($data['code']),
                 'email'           => $data['email'] ?? null,
                 'phone'           => $data['phone'] ?? null,
+                'region_id'       => $data['region_id'],
                 'address'         => $data['address'] ?? null,
                 'village_code'    => $data['village_code'] ?? null,
                 'district_code'   => $data['district_code'] ?? null,
@@ -132,8 +112,53 @@ class BranchService extends BaseService
                 $this->setAsMain($branch);
             }
 
-            return $branch;
+            $this->syncWarehouses($branch, $data['warehouse_ids']);
+
+            return $branch->refresh()->load('warehouses');
         });
+    }
+
+    private function syncWarehouses(Branch $branch, array $warehouseIds): void
+    {
+        $merchantId = (int) MerchantContext::id();
+        $warehouseIds = array_values(array_unique(array_map('intval', $warehouseIds)));
+        $validCount = DB::table('warehouses')
+            ->where('merchant_id', $merchantId)
+            ->whereNull('deleted_at')
+            ->whereIn('id', $warehouseIds)
+            ->count();
+
+        if ($validCount !== count($warehouseIds)) {
+            throw ValidationException::withMessages([
+                'warehouse_ids' => 'Satu atau lebih gudang tidak tersedia untuk merchant ini.',
+            ]);
+        }
+
+        $regionalWarehouseCount = DB::table('warehouse_regions')
+            ->where('merchant_id', $merchantId)
+            ->where('region_id', $branch->region_id)
+            ->whereIn('warehouse_id', $warehouseIds)
+            ->count();
+        if ($regionalWarehouseCount !== count($warehouseIds)) {
+            throw ValidationException::withMessages([
+                'warehouse_ids' => 'Gudang tidak berada dalam satu regional dengan cabang.',
+            ]);
+        }
+
+        DB::table('branch_warehouses')
+            ->where('merchant_id', $merchantId)
+            ->where('branch_id', $branch->id)
+            ->update(['is_primary' => false]);
+
+        $branch->warehouses()->sync(collect($warehouseIds)->mapWithKeys(
+            fn (int $warehouseId, int $index) => [$warehouseId => [
+                'merchant_id' => $merchantId,
+                'is_primary' => $index === 0,
+                'is_active' => true,
+            ]]
+        )->all());
+
+        $branch->forceFill(['primary_warehouse_id' => $warehouseIds[0] ?? null])->save();
     }
 
     public function delete(Branch $branch): void

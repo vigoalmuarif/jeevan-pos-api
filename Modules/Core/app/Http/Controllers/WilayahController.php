@@ -121,4 +121,19 @@ class WilayahController extends BaseController
             'village' => count($parts) === 4 ? $code : null,
         ];
     }
+
+    public function getRegency(Request $request): JsonResponse
+    {
+        $search  = $request->string('search', '')->toString();
+        $perPage = $request->integer('per_page', 15);
+
+        $regency = Wilayah::query()
+            ->whereRaw('LENGTH(kode) = 5')
+            ->when($search, fn($q) => $q->where('nama', 'ilike', "%{$search}%"))
+            ->orderBy('nama')
+            ->limit($perPage)
+            ->get(['kode', 'nama']);
+
+        return $this->success($regency);
+    }
 }

@@ -36,7 +36,10 @@ class Branch extends BaseModel
 
     public function warehouses(): BelongsToMany
     {
-        return $this->belongsToMany(Warehouse::class, 'branch_warehouses');
+        return $this->belongsToMany(Warehouse::class, 'branch_warehouses')
+            ->withPivot(['merchant_id', 'is_primary', 'is_active'])
+            ->withTimestamps()
+            ->orderByPivot('is_primary', 'desc');
     }
 
     public function mainWarehouse(): BelongsTo

@@ -2,55 +2,64 @@
 
 namespace Modules\Product\Http\Controllers;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Modules\Core\Abstracts\BaseController;
+use Modules\Product\Http\Requests\StoreProductRequest;
+use Modules\Product\Http\Requests\StoreVariantRequest;
+use Modules\Product\Http\Requests\UpdateVariantRequest;
+use Modules\Product\Http\Requests\UpdateProductRequest;
+use Modules\Product\Services\ProductService;
+use Modules\Product\Transformers\ProductResource;
 
-class ProductController extends Controller
+class ProductController extends BaseController
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function __construct(protected ProductService $productService) {}
+
+    public function index(\Illuminate\Http\Request $request): AnonymousResourceCollection
     {
-        return view('product::index');
+        return ProductResource::collection($this->productService->getPaginated($request));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(StoreProductRequest $request): JsonResponse
     {
-        return view('product::create');
+        return $this->created(new ProductResource($this->productService->create($request->validated())), 'Produk berhasil dibuat.');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request) {}
-
-    /**
-     * Show the specified resource.
-     */
-    public function show($id)
+    public function show(int $product): JsonResponse
     {
-        return view('product::show');
+        return $this->success(new ProductResource($this->productService->find($product)));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit($id)
+    public function update(UpdateProductRequest $request, int $product): JsonResponse
     {
-        return view('product::edit');
+        return $this->success(new ProductResource($this->productService->update($product, $request->validated())), 'Produk berhasil diperbarui.');
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, $id) {}
+    public function destroy(int $product): JsonResponse
+    {
+        $this->productService->delete($product);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy($id) {}
+        return $this->noContent();
+    }
+
+    public function storeVariant(StoreVariantRequest $request, int $product): JsonResponse
+    {
+        return $this->created(
+            new ProductResource($this->productService->addVariant($product, $request->validated())),
+            'Varian berhasil ditambahkan.'
+        );
+    }
+
+    public function destroyVariant(int $product, int $variant): JsonResponse
+    {
+        $this->productService->setVariantActive($product, $variant, false);
+
+        return $this->noContent();
+    }
+
+    public function updateVariant(UpdateVariantRequest $request, int $product, int $variant): JsonResponse
+    {
+        return $this->success(new ProductResource($this->productService->updateVariant($product, $variant, $request->validated())), 'Varian berhasil diperbarui.');
+    }
 }

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
+     * Pada desain Jeevan, price_lists adalah master tier harga, yaitu daftar harga bernama seperti Eceran, Grosir, Member, atau Reseller. Kolom price_list_id menjawab pertanyaan: “harga ini berlaku untuk daftar harga yang mana?”
      * is_default = tier yang dipakai kalau kasir/transaksi tidak memilih
      * price list eksplisit (umumnya "Retail"). Merchant bebas menambah
      * tier lain (mis. Reseller) tanpa perubahan struktur.

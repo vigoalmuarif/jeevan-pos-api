@@ -8,6 +8,8 @@ use Modules\Core\Traits\ApiResponse;
 use Modules\Merchant\Models\{Merchant, Plan, IndustryPackage, Subscription, MerchantIndustryPackage};
 use Illuminate\Support\Facades\{DB, Hash};
 use Modules\Operational\Services\BranchService;
+use Modules\Operational\Services\RegionalService;
+use Modules\Operational\Services\WarehouseService;
 use Modules\Core\Helpers\MerchantContext;
 use Modules\Merchant\Services\MerchantModuleResolver;
 use Modules\Merchant\Services\MerchantService;
@@ -27,6 +29,8 @@ class SetupWizardService extends BaseService
         private readonly MerchantModuleResolver $moduleResolver,
         private readonly MerchantService $merchantService,
         private readonly BranchService $branchService, 
+        private readonly RegionalService $regionalService,
+        private readonly WarehouseService $warehouseService,
         private readonly RoleService $roleService,
         private readonly UserService $userService,
     ) {}
@@ -48,10 +52,26 @@ class SetupWizardService extends BaseService
             MerchantContext::set($merchant);
             app(PermissionRegistrar::class)->setPermissionsTeamId($merchant->id);
             
-            // 3. Buat Branch & Warehouse default
+            // 3. Buat regional, gudang, dan cabang default yang saling terhubung.
+            $region = $this->regionalService->create([
+                'name' => 'Main Region',
+                'code' => 'MAIN',
+                'type' => 'custom',
+                'is_active' => true,
+            ]);
+
+            $warehouse = $this->warehouseService->create([
+                'name' => 'Main Warehouse',
+                'code' => 'MAIN',
+                'region_ids' => [$region->id],
+                'is_active' => true,
+            ]);
+
             $branch = $this->branchService->create([
                 'name' => 'Main Branch',
                 'code' => 'MAIN',
+                'region_id' => $region->id,
+                'warehouse_ids' => [$warehouse->id],
                 'is_main' => true,
                 'is_active' => true,
             ]);

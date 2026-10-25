@@ -30,11 +30,18 @@ class StoreWarehouseRequest extends FormRequest
                 Rule::unique('warehouses')
                     ->where('merchant_id', MerchantContext::id()),
             ],
-            'branch_id' => 'required',
             'address' => 'required|string',
             'phone'   => 'nullable|string|max:20',
-            'is_main' => 'nullable|boolean',
             'is_active'  => 'nullable|boolean',
+            'region_ids' => ['required', 'array', 'min:1'],
+            'region_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('regions', 'id')->where(
+                    fn ($query) => $query->where('merchant_id', MerchantContext::id())->where('is_active', true)
+                ),
+            ],
         ];
     }
 
@@ -46,8 +53,10 @@ class StoreWarehouseRequest extends FormRequest
             'name.unique' => 'Nama sudah digunakan',
             'code.required' => 'Kode wajib diisi',
             'code.unique' => 'Kode sudah digunakan',
-            'branch_id.required' => 'Cabang wajib dipilih',
             'address.required' => 'Alamat wajib diisi',
+            'region_ids.required' => 'Pilih minimal satu regional yang dilayani gudang',
+            'region_ids.min' => 'Pilih minimal satu regional yang dilayani gudang',
+            'region_ids.*.exists' => 'Regional tidak aktif atau bukan milik merchant ini',
         ];
     }
 }

@@ -8,4 +8,6 @@ Route::middleware(['auth'])->prefix('wilayah')->group(function () {
     Route::get('/', [WilayahController::class, 'index']);
     Route::get('/search', [WilayahController::class, 'search']);
     Route::get('/ancestors', [WilayahController::class, 'ancestors']);
+
+    Route::get('/regency/search', [WilayahController::class, 'getRegency']);
 });

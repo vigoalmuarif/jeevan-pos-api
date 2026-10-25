@@ -8,6 +8,13 @@ use Modules\Core\Helpers\MerchantContext;
 
 class StoreCategoryRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('code')) {
+            $this->merge(['code' => strtoupper(trim((string) $this->input('code')))]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      */
@@ -22,7 +29,14 @@ class StoreCategoryRequest extends FormRequest
                         $q->where('merchant_id', MerchantContext::id());
                     }),
             ],
-
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('categories', 'code')
+                    ->where('merchant_id', MerchantContext::id()),
+            ],
+            'description' => ['nullable', 'string'],
         ];
     }
 
@@ -34,7 +48,8 @@ class StoreCategoryRequest extends FormRequest
                 'max' => 'Maksimal 50 karakter',
                 'unique' => 'Nama kategori sudah ada',
             ],
-
+            'code.required' => 'Kode kategori wajib diisi.',
+            'code.unique' => 'Kode kategori sudah digunakan.',
         ];
     }
 

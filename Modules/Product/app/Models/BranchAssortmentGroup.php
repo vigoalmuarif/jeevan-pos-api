@@ -2,21 +2,10 @@
 
 namespace Modules\Product\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-// use Modules\Product\Database\Factories\BranchAssortmentGroupFactory;
+use Modules\Core\Abstracts\BaseModel;
+use Modules\Core\Traits\BelongsToMerchant;
 
-class BranchAssortmentGroup extends Model
+class BranchAssortmentGroup extends BaseModel
 {
-    use HasFactory;
-
-    /**
-     * The attributes that are mass assignable.
-     */
-    protected $fillable = [];
-
-    // protected static function newFactory(): BranchAssortmentGroupFactory
-    // {
-    //     // return BranchAssortmentGroupFactory::new();
-    // }
+    use BelongsToMerchant;
 }

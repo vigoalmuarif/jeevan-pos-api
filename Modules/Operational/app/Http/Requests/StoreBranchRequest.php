@@ -42,10 +42,22 @@ class StoreBranchRequest extends FormRequest
             'receipt_footer' => 'nullable|string',
             'is_main' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
-            'is_same_address' => 'nullable|boolean',
-            'warehouse_code' => 'required|string|max:20',
-            'warehouse_name' => 'required|string|max:80',
-            'warehouse_address' => 'required|string|max:200',
+            'region_id' => [
+                'required',
+                'integer',
+                Rule::exists('regions', 'id')->where(
+                    fn ($query) => $query->where('merchant_id', MerchantContext::id())->where('is_active', true)
+                ),
+            ],
+            'warehouse_ids' => ['required', 'array', 'min:1'],
+            'warehouse_ids.*' => [
+                'required',
+                'integer',
+                'distinct',
+                Rule::exists('warehouses', 'id')->where(
+                    fn ($query) => $query->where('merchant_id', MerchantContext::id())->whereNull('deleted_at')
+                ),
+            ],
         ];
     }
 
@@ -62,9 +74,11 @@ class StoreBranchRequest extends FormRequest
             'regency_code.required' => 'Kabupaten/Kota wajib diisi',
             'district_code.required' => 'Kecamatan wajib diisi',
             'village_code.required' => 'Desa/Kelurahan wajib diisi',
-            'warehouse_code.required' => 'Kode gudang wajib diisi',
-            'warehouse_name.required' => 'Nama gudang wajib diisi',
-            'warehouse_address.required' => 'Alamat gudang wajib diisi',
+            'region_id.required' => 'Regional cabang wajib dipilih',
+            'region_id.exists' => 'Regional cabang tidak aktif atau bukan milik merchant ini',
+            'warehouse_ids.required' => 'Pilih minimal satu gudang untuk cabang ini',
+            'warehouse_ids.min' => 'Pilih minimal satu gudang untuk cabang ini',
+            'warehouse_ids.*.exists' => 'Gudang tidak tersedia untuk merchant ini',
         ];
     }
 }

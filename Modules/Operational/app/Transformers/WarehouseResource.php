@@ -10,17 +10,35 @@ class WarehouseResource extends JsonResource
     {
         return [
             'id'         => $this->id,
-            'branch_id'  => $this->branch_id,
             'name'       => $this->name,
             'slug'       => $this->slug,
             'code'       => $this->code,
             'type'       => $this->type,
             'address'    => $this->address,
             'phone'      => $this->phone,
-            'is_main'    => $this->is_main,
+            'is_main'    => $this->whenLoaded(
+                'branches',
+                fn () => $this->branches->contains(fn ($branch) => (bool) $branch->pivot?->is_primary),
+                false
+            ),
             'is_active'  => $this->is_active,
-            'regions'   => $this->whenLoaded('regions'),
-            'branches'   => $this->whenLoaded('branches'),
+            'branches'   => $this->whenLoaded('branches', fn () => $this->branches->map(fn ($branch) => [
+                'id' => $branch->id,
+                'name' => $branch->name,
+                'code' => $branch->code,
+                'is_primary' => (bool) $branch->pivot?->is_primary,
+            ])),
+            'regions' => $this->whenLoaded('regions', fn () => $this->regions->map(fn ($region) => [
+                'id' => $region->id,
+                'name' => $region->name,
+                'code' => $region->code,
+                'type' => $region->type,
+            ])),
+            'region_ids' => $this->whenLoaded(
+                'regions',
+                fn () => $this->regions->pluck('id')->map(fn ($id) => (int) $id)->all(),
+                []
+            ),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

@@ -39,6 +39,7 @@ class DatabaseSeeder extends Seeder
 
             // PRODUCT ATRIBUTTE
             \Modules\Product\Database\Seeders\UnitSeeder::class,
+            \Modules\Product\Database\Seeders\ProductDatabaseSeeder::class,
 
             \Modules\Permission\Database\Seeders\MenuSeeder::class,
 

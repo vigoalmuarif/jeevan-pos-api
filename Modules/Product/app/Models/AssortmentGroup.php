@@ -2,21 +2,18 @@
 
 namespace Modules\Product\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-// use Modules\Product\Database\Factories\AssortmentGroupFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Modules\Core\Abstracts\BaseModel;
+use Modules\Core\Traits\BelongsToMerchant;
 
-class AssortmentGroup extends Model
+class AssortmentGroup extends BaseModel
 {
-    use HasFactory;
+    use BelongsToMerchant, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     */
-    protected $fillable = [];
-
-    // protected static function newFactory(): AssortmentGroupFactory
-    // {
-    //     // return AssortmentGroupFactory::new();
-    // }
+    public function variants(): BelongsToMany
+    {
+        return $this->belongsToMany(ProductVariant::class, 'assortment_group_products')
+            ->withPivot('merchant_id')->withTimestamps();
+    }
 }
