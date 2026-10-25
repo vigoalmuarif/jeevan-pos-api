@@ -2,12 +2,16 @@
 
 namespace Modules\Operational\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Modules\Core\Abstracts\BaseController;
+use Modules\Operational\Http\Requests\StoreRegionalRequest;
+use Modules\Operational\Http\Requests\UpdateRegionalRequest;
+use Modules\Operational\Models\Region;
 use Modules\Operational\Services\RegionalService;
 use Modules\Operational\Transformers\RegionResource;
 
-class RegionController extends Controller
+class RegionController extends BaseController
 {
      public function __construct(
         private readonly RegionalService $regionService
@@ -20,42 +24,34 @@ class RegionController extends Controller
         return RegionResource::collection($regions);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function options(): JsonResponse
     {
-        return view('operational::create');
+        return $this->success($this->regionService->getOptions());
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request) {}
-
-    /**
-     * Show the specified resource.
-     */
-    public function show($id)
+    public function store(StoreRegionalRequest $request): JsonResponse
     {
-        return view('operational::show');
+        $region = $this->regionService->create($request->validated());
+
+        return $this->created(new RegionResource($region));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit($id)
+    public function edit(Region $regional): JsonResponse
     {
-        return view('operational::edit');
+        return $this->success(new RegionResource($regional->load('parent:id,name,code,type')));
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, $id) {}
+    public function update(UpdateRegionalRequest $request, Region $regional): JsonResponse
+    {
+        $region = $this->regionService->update($regional, $request->validated());
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy($id) {}
+        return $this->success(new RegionResource($region));
+    }
+
+    public function destroy(Region $regional): JsonResponse
+    {
+        $this->regionService->delete($regional);
+
+        return $this->noContent();
+    }
 }

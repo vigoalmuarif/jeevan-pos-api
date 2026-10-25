@@ -3,6 +3,8 @@
 namespace Modules\Operational\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
+use Modules\Core\Helpers\MerchantContext;
 
 class StoreRegionalRequest extends FormRequest
 {
@@ -11,7 +13,24 @@ class StoreRegionalRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [];
+        $merchantId = MerchantContext::id();
+
+        return [
+            'name' => ['required', 'string', 'max:255'],
+            'code' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('regions', 'code')->where('merchant_id', $merchantId),
+            ],
+            'type' => ['required', Rule::in(['province', 'city', 'custom'])],
+            'parent_region_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('regions', 'id')->where('merchant_id', $merchantId),
+            ],
+            'is_active' => ['sometimes', 'boolean'],
+        ];
     }
 
     /**

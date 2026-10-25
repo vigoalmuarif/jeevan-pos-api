@@ -4,6 +4,8 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Modules\Purchase\Exceptions\PurchaseCalculationException;
+use Modules\Purchase\Exceptions\PurchaseRuleException;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
@@ -46,6 +48,13 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json([
                 'message' => 'Parameter tidak valid.',
                 'errors' => ['query' => [$e->getMessage()]],
+            ], 422);
+        });
+
+        $exceptions->render(function (PurchaseRuleException|PurchaseCalculationException $e, $request) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => ['document' => [$e->getMessage()]],
             ], 422);
         });
     })->create();

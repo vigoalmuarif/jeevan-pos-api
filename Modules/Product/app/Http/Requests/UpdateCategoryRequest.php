@@ -8,6 +8,13 @@ use Modules\Core\Helpers\MerchantContext;
 
 class UpdateCategoryRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('code')) {
+            $this->merge(['code' => strtoupper(trim((string) $this->input('code')))]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -20,7 +27,16 @@ class UpdateCategoryRequest extends FormRequest
                     })
                     ->ignore($this->category->id),
             ],
-
+            'code' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('categories', 'code')
+                    ->where('merchant_id', MerchantContext::id())
+                    ->ignore($this->category->id),
+            ],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -32,7 +48,8 @@ class UpdateCategoryRequest extends FormRequest
                 'max' => 'Maksimal 50 karakter',
                 'unique' => 'Nama kategori sudah ada',
             ],
-
+            'code.required' => 'Kode kategori wajib diisi.',
+            'code.unique' => 'Kode kategori sudah digunakan.',
         ];
     }
 

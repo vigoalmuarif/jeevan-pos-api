@@ -2,21 +2,10 @@
 
 namespace Modules\Inventory\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-// use Modules\Inventory\Database\Factories\WarehouseStockFactory;
+use Modules\Core\Abstracts\BaseModel;
+use Modules\Core\Traits\BelongsToMerchant;
 
-class WarehouseStock extends Model
+class WarehouseStock extends BaseModel
 {
-    use HasFactory;
-
-    /**
-     * The attributes that are mass assignable.
-     */
-    protected $fillable = [];
-
-    // protected static function newFactory(): WarehouseStockFactory
-    // {
-    //     // return WarehouseStockFactory::new();
-    // }
+    use BelongsToMerchant;
 }

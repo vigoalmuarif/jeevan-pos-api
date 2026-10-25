@@ -17,6 +17,7 @@ return new class extends Migration
                 ->nullable()
                 ->constrained('merchants')
                 ->cascadeOnDelete();
+            $table->string('code')->unique();
             $table->string('name');
             $table->string('slug');
             $table->text('description')->nullable();
@@ -26,6 +27,7 @@ return new class extends Migration
 
             $table->unique(['merchant_id', 'slug']);
             $table->index(['merchant_id', 'is_active']);
+            $table->index(['merchant_id', 'code']);
         });
     }
 

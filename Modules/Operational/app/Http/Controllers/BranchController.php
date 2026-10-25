@@ -39,7 +39,7 @@ class BranchController extends BaseController
     {
         return $this->success(
             new BranchResource(
-                $branch->load(['village', 'district', 'regency', 'province'])
+                $branch->load(['village', 'district', 'regency', 'province', 'region', 'warehouses'])
             )
         );
     }
@@ -48,14 +48,14 @@ class BranchController extends BaseController
     {
         return $this->success(
             new BranchResource(
-                $branch->load(['village', 'district', 'regency', 'province'])
+                $branch->load(['village', 'district', 'regency', 'province', 'region', 'warehouses'])
             )
         );
     }
 
     public function store(StoreBranchRequest $request): JsonResponse
     {
-        $branch = $this->branchService->create($request->all());
+        $branch = $this->branchService->create($request->validated());
 
         return $this->success(new BranchResource($branch));
     }
@@ -66,12 +66,12 @@ class BranchController extends BaseController
     ): JsonResponse {
         $branch = $this->branchService->update(
             $branch,
-            $request->all()
+            $request->validated()
         );
 
         return $this->success(
             new BranchResource(
-                $branch->load(['village', 'district', 'regency', 'province'])
+                $branch->load(['village', 'district', 'regency', 'province', 'region', 'warehouses'])
             )
         );
     }

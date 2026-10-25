@@ -13,7 +13,7 @@ class PermissionSeeder extends Seeder
     public function run(): void
     {
         $permissions = $this->permissions();
-        
+
         $this->permissionCatalogService->forget();
 
         foreach ($permissions as $permission) {
@@ -74,7 +74,7 @@ class PermissionSeeder extends Seeder
             ['group' => 'warehouse', 'name' => 'core.warehouse.update', 'module_code' => 'operational',  'display_name' => 'Edit Gudang'],
             ['group' => 'warehouse', 'name' => 'core.warehouse.delete', 'module_code' => 'operational',  'display_name' => 'Hapus Gudang'],
 
-            
+
             // ------------------------------------------------
             // Product
             // ------------------------------------------------
@@ -111,27 +111,18 @@ class PermissionSeeder extends Seeder
             // ------------------------------------------------
             // Customer
             // ------------------------------------------------
-            ['group' => 'customer', 'name' => 'customer.view',  'module_code' => 'customer',    'display_name' => 'Lihat Pelanggan'],
-            ['group' => 'customer', 'name' => 'customer.create', 'module_code' => 'customer',  'display_name' => 'Tambah Pelanggan'],
-            ['group' => 'customer', 'name' => 'customer.update', 'module_code' => 'customer',  'display_name' => 'Edit Pelanggan'],
-            ['group' => 'customer', 'name' => 'customer.delete', 'module_code' => 'customer',  'display_name' => 'Hapus Pelanggan'],
+            ['group' => 'customer', 'name' => 'partner.customer.view',  'module_code' => 'partner',    'display_name' => 'Lihat Pelanggan'],
+            ['group' => 'customer', 'name' => 'partner.customer.create', 'module_code' => 'partner',  'display_name' => 'Tambah Pelanggan'],
+            ['group' => 'customer', 'name' => 'partner.customer.update', 'module_code' => 'partner',  'display_name' => 'Edit Pelanggan'],
+            ['group' => 'customer', 'name' => 'partner.customer.delete', 'module_code' => 'partner',  'display_name' => 'Hapus Pelanggan'],
 
             // ------------------------------------------------
             // Supplier
             // ------------------------------------------------
-            ['group' => 'supplier', 'name' => 'supplier.view', 'module_code' => 'supplier',    'display_name' => 'Lihat Supplier'],
-            ['group' => 'supplier', 'name' => 'supplier.create', 'module_code' => 'supplier',  'display_name' => 'Tambah Supplier'],
-            ['group' => 'supplier', 'name' => 'supplier.update', 'module_code' => 'supplier',  'display_name' => 'Edit Supplier'],
-            ['group' => 'supplier', 'name' => 'supplier.delete', 'module_code' => 'supplier',  'display_name' => 'Hapus Supplier'],
-
-            // ------------------------------------------------
-            // Purchase
-            // ------------------------------------------------
-            ['group' => 'purchase', 'name' => 'purchase.view', 'module_code' => 'purchase',    'display_name' => 'Lihat Pembelian'],
-            ['group' => 'purchase', 'name' => 'purchase.create', 'module_code' => 'purchase',  'display_name' => 'Tambah Pembelian'],
-            ['group' => 'purchase', 'name' => 'purchase.update', 'module_code' => 'purchase',  'display_name' => 'Edit Pembelian'],
-            ['group' => 'purchase', 'name' => 'purchase.delete', 'module_code' => 'purchase',  'display_name' => 'Hapus Pembelian'],
-            ['group' => 'purchase', 'name' => 'purchase.approve', 'module_code' => 'purchase', 'display_name' => 'Approve Pembelian'],
+            ['group' => 'supplier', 'name' => 'partner.supplier.view', 'module_code' => 'partner',    'display_name' => 'Lihat Supplier'],
+            ['group' => 'supplier', 'name' => 'partner.supplier.create', 'module_code' => 'partner',  'display_name' => 'Tambah Supplier'],
+            ['group' => 'supplier', 'name' => 'partner.supplier.update', 'module_code' => 'partner',  'display_name' => 'Edit Supplier'],
+            ['group' => 'supplier', 'name' => 'partner.supplier.delete', 'module_code' => 'partner',  'display_name' => 'Hapus Supplier'],
 
             // ------------------------------------------------
             // Sales
@@ -141,20 +132,56 @@ class PermissionSeeder extends Seeder
             ['group' => 'sales', 'name' => 'sales.void', 'module_code' => 'sales',    'display_name' => 'Void Transaksi'],
             ['group' => 'sales', 'name' => 'sales.refund', 'module_code' => 'sales',  'display_name' => 'Refund Transaksi'],
             ['group' => 'sales', 'name' => 'sales.report', 'module_code' => 'sales',  'display_name' => 'Laporan Penjualan'],
-            ['group' => 'sales', 'name' => 'sales.discount', 'module_code' => 'sales', 'display_name'=> 'Beri Diskon'],
+            ['group' => 'sales', 'name' => 'sales.discount', 'module_code' => 'sales', 'display_name' => 'Beri Diskon'],
 
             // ------------------------------------------------
             // Inventory
             // ------------------------------------------------
             ['group' => 'inventory', 'name' => 'inventory.view', 'module_code' => 'inventory',      'display_name' => 'Lihat Stok'],
+
             ['group' => 'inventory', 'name' => 'inventory.movement.view', 'module_code' => 'inventory',      'display_name' => 'Lihat Mutasi Stok'],
+
             ['group' => 'inventory', 'name' => 'inventory.adjustment.view', 'module_code' => 'inventory',    'display_name' => 'Adjustment Stok'],
             ['group' => 'inventory', 'name' => 'inventory.adjustment.create', 'module_code' => 'inventory',    'display_name' => 'Buat Adjustment Stok'],
             ['group' => 'inventory', 'name' => 'inventory.adjustment.approve', 'module_code' => 'inventory',    'display_name' => 'Approve Adjustment Stok'],
+
             ['group' => 'inventory', 'name' => 'inventory.transfer.view', 'module_code' => 'inventory',  'display_name' => 'Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.transfer.create', 'module_code' => 'inventory',  'display_name' => 'Buat Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.transfer.approve', 'module_code' => 'inventory',  'display_name' => 'Approve Transfer Stok'],
+
             ['group' => 'inventory', 'name' => 'inventory.report', 'module_code' => 'inventory',    'display_name' => 'Laporan Stok'],
+
+
+
+
+            // ------------------------------------------------
+            // Purchase
+            // ------------------------------------------------
+            ['group' => 'purchase', 'name' => 'purchase.order.view',    'module_code' => 'purchase', 'display_name' => 'Lihat Purchase Order'],
+            ['group' => 'purchase', 'name' => 'purchase.order.create',  'module_code' => 'purchase', 'display_name' => 'Buat Purchase Order'],
+            ['group' => 'purchase', 'name' => 'purchase.order.update',  'module_code' => 'purchase', 'display_name' => 'Ubah Purchase Order'],
+            ['group' => 'purchase', 'name' => 'purchase.order.delete',  'module_code' => 'purchase', 'display_name' => 'Hapus Draft Purchase Order'],
+            ['group' => 'purchase', 'name' => 'purchase.order.approve', 'module_code' => 'purchase', 'display_name' => 'Approve Purchase Order'],
+            ['group' => 'purchase', 'name' => 'purchase.order.cancel',  'module_code' => 'purchase', 'display_name' => 'Batalkan Purchase Order'],
+            ['group' => 'purchase', 'name' => 'purchase.order.close',   'module_code' => 'purchase', 'display_name' => 'Tutup Purchase Order'],
+
+            ['group' => 'purchase', 'name' => 'purchase.receipt.view',   'module_code' => 'purchase', 'display_name' => 'Lihat Penerimaan Barang'],
+            ['group' => 'purchase', 'name' => 'purchase.receipt.create', 'module_code' => 'purchase', 'display_name' => 'Buat Penerimaan Barang'],
+            ['group' => 'purchase', 'name' => 'purchase.receipt.update', 'module_code' => 'purchase', 'display_name' => 'Ubah Penerimaan Barang'],
+            ['group' => 'purchase', 'name' => 'purchase.receipt.delete', 'module_code' => 'purchase', 'display_name' => 'Hapus Draft Penerimaan Barang'],
+            ['group' => 'purchase', 'name' => 'purchase.receipt.post',   'module_code' => 'purchase', 'display_name' => 'Posting Penerimaan Barang'],
+            ['group' => 'purchase', 'name' => 'purchase.receipt.void',   'module_code' => 'purchase', 'display_name' => 'Batalkan Penerimaan Barang'],
+
+            ['group' => 'purchase', 'name' => 'purchase.invoice.view',   'module_code' => 'purchase', 'display_name' => 'Lihat Faktur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.invoice.create', 'module_code' => 'purchase', 'display_name' => 'Buat Faktur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.invoice.update', 'module_code' => 'purchase', 'display_name' => 'Ubah Faktur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.invoice.delete', 'module_code' => 'purchase', 'display_name' => 'Hapus Draft Faktur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.invoice.post',   'module_code' => 'purchase', 'display_name' => 'Posting Faktur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.invoice.void',   'module_code' => 'purchase', 'display_name' => 'Batalkan Faktur Pembelian'],
+
+            ['group' => 'purchase', 'name' => 'purchase.payment.view',   'module_code' => 'purchase', 'display_name' => 'Lihat Pembayaran Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.payment.create', 'module_code' => 'purchase', 'display_name' => 'Buat Pembayaran Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.payment.void',   'module_code' => 'purchase', 'display_name' => 'Batalkan Pembayaran Pembelian'],
 
             // ------------------------------------------------
             // Dashboard

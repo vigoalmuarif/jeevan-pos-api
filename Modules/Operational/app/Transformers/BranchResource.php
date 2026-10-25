@@ -19,6 +19,7 @@ class BranchResource extends JsonResource
             'receipt_footer' => $this->receipt_footer,
             'is_main' => $this->is_main,
             'is_active' => $this->is_active,
+            'region_id' => $this->region_id,
             'region' => $this->whenLoaded('region'),
             'address' => [
                 'street' => $this->address,

@@ -6,5 +6,7 @@
     "Core": true,
     "Auth": true,
     "Product": true,
-    "Inventory": true
+    "Inventory": true,
+    "Partner": true,
+    "Purchase": true
 }
