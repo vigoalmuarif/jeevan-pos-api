@@ -17,6 +17,10 @@ class RouteServiceProvider extends ServiceProvider
     public function boot(): void
     {
         parent::boot();
+        require_once module_path(
+            'Core',
+            'app/Helpers/Helpers.php'
+        );
     }
 
     /**

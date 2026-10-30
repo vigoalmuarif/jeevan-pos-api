@@ -13,9 +13,10 @@ class PurchaseDocumentNumberService
     private const DOCUMENTS = [
         'purchase_order' => ['prefix' => 'PO', 'table' => 'purchase_orders'],
         'goods_receipt' => ['prefix' => 'GR', 'table' => 'goods_receipts'],
-        // [DITAMBAH] dua dokumen lain di module Purchase.
         'purchase_invoice' => ['prefix' => 'PI', 'table' => 'purchase_invoices'],
         'purchase_payment' => ['prefix' => 'PAY', 'table' => 'purchase_payments'],
+        'purchase_request' => ['prefix' => 'PR', 'table' => 'purchase_requests'],
+        'purchase_return' => ['prefix' => 'PRET', 'table' => 'purchase_returns'],
     ];
 
     public function generate(string $type): string
@@ -25,17 +26,10 @@ class PurchaseDocumentNumberService
 
         $document = self::DOCUMENTS[$type] ?? throw new InvalidArgumentException('Jenis dokumen pembelian tidak dikenal.');
 
-        // [DITAMBAH] Kunci baris hanya bertahan sampai transaksi selesai. Di luar transaksi
-        // kunci langsung lepas dan dua request bisa mendapat nomor sama, jadi gagal keras.
         if (DB::transactionLevel() === 0) {
             throw new LogicException('PurchaseDocumentNumberService::generate() harus dipanggil di dalam DB::transaction().');
         }
 
-        // [DIUBAH] "for no key update", bukan lockForUpdate() ("for update").
-        // Setiap INSERT ke tabel yang punya FK ke merchants mengambil FOR KEY SHARE pada baris
-        // merchant; FOR UPDATE bentrok dengan itu sehingga SEMUA insert merchant tersebut
-        // (produk, mutasi stok, dll.) ikut menunggu selama transaksi pembuat nomor berjalan.
-        // FOR NO KEY UPDATE tetap menyerialkan pembuat nomor, tanpa menahan insert lain.
         DB::table('merchants')->where('id', $merchantId)->lock('for no key update')->first();
 
         $prefix = $document['prefix'].'-'.now()->format('Ymd').'-';

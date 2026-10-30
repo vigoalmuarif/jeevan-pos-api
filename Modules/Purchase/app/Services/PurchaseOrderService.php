@@ -2,12 +2,20 @@
 
 namespace Modules\Purchase\Services;
 
+use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
+use Modules\Core\Helpers\MerchantContext;
+use Modules\Core\Support\DataTableConfig;
+use Modules\Core\Support\ServerSideTable;
+use Modules\ExtPurchaseRequest\Services\PurchaseRequestOrderLinker;
 use Modules\Purchase\Enums\PurchaseOrderStatus;
 use Modules\Purchase\Exceptions\PurchaseRuleException;
 use Modules\Purchase\Models\PurchaseOrder;
+use Modules\Purchase\Support\SeparationOfDuties;
+use Spatie\QueryBuilder\AllowedFilter;
 
 /**
  * Siklus hidup Purchase Order: create/update/delete draft, approve, cancel, close,
@@ -30,7 +38,107 @@ class PurchaseOrderService
     public function __construct(
         private readonly PurchaseDocumentPreparer $preparer,
         private readonly PurchaseDocumentNumberService $numbers,
+        private readonly PurchaseSettingsResolver $settings,
+        private readonly PurchaseRequestOrderLinker $requestLinks,
     ) {}
+
+    public function getPaginated(Request $request): LengthAwarePaginator
+    {
+        $config = new DataTableConfig(
+            allowedFilters: [
+                AllowedFilter::exact('status'),
+                AllowedFilter::exact('supplier_id'),
+                AllowedFilter::exact('warehouse_id'),
+                AllowedFilter::exact('branch_id'),
+            ],
+            allowedSorts: ['document_number', 'order_date', 'expected_date', 'grand_total', 'created_at'],
+            searchableColumns: ['document_number'],
+            defaultSort: '-order_date',
+        );
+
+        return ServerSideTable::paginate(
+            PurchaseOrder::query()
+                ->with(['supplier:id,name,code', 'warehouse:id,name,code', 'branch:id,name'])
+                ->withCount('items'),
+            $config,
+            $request
+        );
+    }
+
+    public function find(int $id): PurchaseOrder
+    {
+        return PurchaseOrder::query()
+            ->with([
+                'supplier:id,name,code,payment_term_days,phone,email',
+                'warehouse:id,name,code',
+                'branch:id,name',
+                'items.productVariant.product:id,name',
+                'items.unit:id,name,code',
+                'items.requestLinks.requestItem.purchaseRequest:id,document_number,request_date',
+                'goodsReceipts:id,purchase_order_id,document_number,status,receipt_date',
+            ])
+            ->findOrFail($id);
+    }
+
+    public function getOptions(): array
+    {
+        $merchantId = MerchantContext::id();
+        abort_unless($merchantId, 403, 'Merchant context is required.');
+
+        $suppliers = DB::table('suppliers')
+            ->where('merchant_id', $merchantId)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'payment_term_days']);
+
+        $warehouses = DB::table('warehouses')
+            ->where('merchant_id', $merchantId)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+
+        $branches = DB::table('branches')
+            ->where('merchant_id', $merchantId)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get(['id', 'name', 'code']);
+
+        $settings = $this->settings->get();
+
+        return [
+            'suppliers' => $suppliers,
+            'warehouses' => $warehouses,
+            'branches' => $branches,
+            'settings' => [
+                'default_tax_rate' => $settings->defaultTaxRate,
+                'tax_in_cost' => $settings->taxInCost,
+                'prices_include_tax' => $settings->pricesIncludeTax,
+                'require_po' => $settings->requirePo,
+                'separate_approver' => $settings->separateApprover,
+            ],
+        ];
+    }
+
+    public function getReceivable(?int $supplierId = null): Collection
+    {
+        $query = PurchaseOrder::query()
+            ->whereIn('status', [PurchaseOrderStatus::Approved, PurchaseOrderStatus::PartiallyReceived])
+            ->with([
+                'supplier:id,name,code',
+                'warehouse:id,name,code',
+                'items.productVariant.product:id,name',
+                'items.unit:id,name,code',
+            ]);
+
+        if ($supplierId !== null) {
+            $query->where('supplier_id', $supplierId);
+        }
+
+        return $query->orderByDesc('order_date')->get();
+    }
 
     public function create(array $data, array $lines): PurchaseOrder
     {
@@ -60,6 +168,12 @@ class PurchaseOrderService
                 throw new PurchaseRuleException('Hanya PO berstatus draft yang dapat diubah.');
             }
 
+            // Item PO hasil konversi PR terhubung ke pembukuan qty PR; mengganti item akan merusaknya.
+            // Hapus draft (qty PR kembali menjadi sisa) lalu konversi ulang.
+            if ($this->requestLinks->hasLinks($order)) {
+                throw new PurchaseRuleException('PO ini dibuat dari Purchase Request dan itemnya tidak dapat diubah. Hapus draft lalu buat ulang dari PR.');
+            }
+
             $prepared = $this->preparer->prepare($data, $lines, forReceipt: false);
 
             $order->fill(array_merge(Arr::only($data, self::HEADER_FIELDS), $prepared->header))->save();
@@ -79,6 +193,8 @@ class PurchaseOrderService
                 throw new PurchaseRuleException('Hanya PO berstatus draft yang dapat dihapus. PO lain dibatalkan atau ditutup.');
             }
 
+            event(new \Modules\Purchase\Events\PurchaseOrderDeleted($order));
+
             $order->delete(); // soft delete
         });
     }
@@ -94,6 +210,13 @@ class PurchaseOrderService
             if (! $order->items()->exists()) {
                 throw new PurchaseRuleException('PO tanpa item tidak dapat disetujui.');
             }
+
+            // SeparationOfDuties::assertApprover(
+            //     $this->settings->get()->separateApprover,
+            //     $order->created_by,
+            //     auth('merchant')->id(),
+            //     'Purchase Order'
+            // );
 
             $order->forceFill([
                 'status' => PurchaseOrderStatus::Approved,
@@ -128,6 +251,8 @@ class PurchaseOrderService
                 'cancelled_by' => auth('merchant')->id(),
                 'cancel_reason' => $reason,
             ])->save();
+
+            event(new \Modules\Purchase\Events\PurchaseOrderCancelled($order, $reason));
 
             return $order;
         });

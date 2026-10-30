@@ -41,6 +41,45 @@ class MerchantController extends BaseController
         );
     }
 
+    public function context(Request $request, Merchant $merchant): JsonResponse
+    {
+        $user = $request->user('merchant') ?? $request->user();
+        $entitlementService = app(\Modules\Merchant\Services\ModuleEntitlementService::class);
+        $entitledModules = $entitlementService->getEntitledModuleCodes($merchant);
+
+        $permissions = [];
+        $roles = [];
+        if ($user) {
+            $roles = $user->roles()->pluck('name')->values()->all();
+            $permissions = ($user->hasRole('owner') || $user->is_owner)
+                ? (app(\Modules\Permission\Services\PermissionCatalogService::class)->allNames() ?? [])
+                : ($user->getAllPermissions()->pluck('name')->values()->all());
+        }
+
+        $data = [
+            'merchant' => [
+                'id' => $merchant->id,
+                'ulid' => $merchant->ulid,
+                'name' => $merchant->name,
+                'slug' => $merchant->slug,
+                'status' => $merchant->status,
+                'currency' => $merchant->currency ?? 'IDR',
+                'timezone' => $merchant->timezone ?? 'Asia/Jakarta',
+            ],
+            'user' => $user ? [
+                'id' => $user->id,
+                'name' => $user->name,
+                'username' => $user->username,
+                'email' => $user->email,
+                'roles' => $roles,
+                'permissions' => $permissions,
+            ] : null,
+            'entitled_modules' => $entitledModules,
+        ];
+
+        return $this->success($data, 'Merchant context retrieved successfully.');
+    }
+
     public function store(StoreMerchantRequest $request, MerchantService $service ): JsonResponse
     {
         $result = $service->create(

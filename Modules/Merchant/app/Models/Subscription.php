@@ -15,6 +15,21 @@ class Subscription extends BaseModel
         'cancelled_at'  => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (self $subscription) {
+            if ($subscription->merchant_id) {
+                app(\Modules\Merchant\Services\ModuleEntitlementService::class)->clearCache($subscription->merchant_id);
+            }
+        });
+
+        static::deleted(function (self $subscription) {
+            if ($subscription->merchant_id) {
+                app(\Modules\Merchant\Services\ModuleEntitlementService::class)->clearCache($subscription->merchant_id);
+            }
+        });
+    }
+
     public function merchant(): BelongsTo
     {
         return $this->belongsTo(Merchant::class);

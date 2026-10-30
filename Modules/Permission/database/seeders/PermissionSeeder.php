@@ -12,6 +12,16 @@ class PermissionSeeder extends Seeder
 
     public function run(): void
     {
+        $this->sync();
+    }
+
+    /**
+     * Sinkronkan katalog permission sistem dan hapus cache katalog.
+     *
+     * @return int jumlah definisi permission yang diproses
+     */
+    public function sync(): int
+    {
         $permissions = $this->permissions();
 
         $this->permissionCatalogService->forget();
@@ -29,9 +39,14 @@ class PermissionSeeder extends Seeder
                 ]
             );
         }
+
+        return count($permissions);
     }
 
-    private function permissions(): array
+    /**
+     * @return list<array{group:string,name:string,module_code:string,display_name:string,description?:string|null}>
+     */
+    public function permissions(): array
     {
         return [
             // ------------------------------------------------
@@ -145,18 +160,36 @@ class PermissionSeeder extends Seeder
             ['group' => 'inventory', 'name' => 'inventory.adjustment.create', 'module_code' => 'inventory',    'display_name' => 'Buat Adjustment Stok'],
             ['group' => 'inventory', 'name' => 'inventory.adjustment.approve', 'module_code' => 'inventory',    'display_name' => 'Approve Adjustment Stok'],
 
+            #Transfer stok
+
             ['group' => 'inventory', 'name' => 'inventory.transfer.view', 'module_code' => 'inventory',  'display_name' => 'Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.transfer.create', 'module_code' => 'inventory',  'display_name' => 'Buat Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.transfer.approve', 'module_code' => 'inventory',  'display_name' => 'Approve Transfer Stok'],
-
+            ['group' => 'inventory', 'name' => 'inventory.transfer.update',  'module_code' => 'inventory', 'display_name' => 'Ubah Transfer Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.transfer.delete',  'module_code' => 'inventory', 'display_name' => 'Hapus Draft Transfer Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.transfer.ship',    'module_code' => 'inventory', 'display_name' => 'Kirim Transfer Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.transfer.receive', 'module_code' => 'inventory', 'display_name' => 'Terima Transfer Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.transfer.cancel',  'module_code' => 'inventory', 'display_name' => 'Batalkan Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.report', 'module_code' => 'inventory',    'display_name' => 'Laporan Stok'],
-
-
 
 
             // ------------------------------------------------
             // Purchase
             // ------------------------------------------------
+
+            ['group' => 'purchase', 'name' => 'purchase.request.view',      'module_code' => 'purchase', 'display_name' => 'Lihat Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.create',    'module_code' => 'purchase', 'display_name' => 'Buat Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.update',    'module_code' => 'purchase', 'display_name' => 'Ubah Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.delete',    'module_code' => 'purchase', 'display_name' => 'Hapus Draft Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.submit',    'module_code' => 'purchase', 'display_name' => 'Ajukan Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.approve',   'module_code' => 'purchase', 'display_name' => 'Setujui Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.reject',    'module_code' => 'purchase', 'display_name' => 'Tolak Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.convert',   'module_code' => 'purchase', 'display_name' => 'Jadikan PO dari Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.cancel',    'module_code' => 'purchase', 'display_name' => 'Batalkan Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.close',     'module_code' => 'purchase', 'display_name' => 'Tutup Purchase Request'],
+            ['group' => 'purchase', 'name' => 'purchase.request.recommend', 'module_code' => 'purchase', 'display_name' => 'Lihat Rekomendasi Pembelian'],
+
+
             ['group' => 'purchase', 'name' => 'purchase.order.view',    'module_code' => 'purchase', 'display_name' => 'Lihat Purchase Order'],
             ['group' => 'purchase', 'name' => 'purchase.order.create',  'module_code' => 'purchase', 'display_name' => 'Buat Purchase Order'],
             ['group' => 'purchase', 'name' => 'purchase.order.update',  'module_code' => 'purchase', 'display_name' => 'Ubah Purchase Order'],
@@ -182,6 +215,19 @@ class PermissionSeeder extends Seeder
             ['group' => 'purchase', 'name' => 'purchase.payment.view',   'module_code' => 'purchase', 'display_name' => 'Lihat Pembayaran Pembelian'],
             ['group' => 'purchase', 'name' => 'purchase.payment.create', 'module_code' => 'purchase', 'display_name' => 'Buat Pembayaran Pembelian'],
             ['group' => 'purchase', 'name' => 'purchase.payment.void',   'module_code' => 'purchase', 'display_name' => 'Batalkan Pembayaran Pembelian'],
+
+            // Purchase Return (DEC-10)
+            ['group' => 'purchase', 'name' => 'purchase.return.view',   'module_code' => 'purchase', 'display_name' => 'Lihat Retur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.return.create', 'module_code' => 'purchase', 'display_name' => 'Buat Retur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.return.update', 'module_code' => 'purchase', 'display_name' => 'Ubah Retur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.return.delete', 'module_code' => 'purchase', 'display_name' => 'Hapus Draft Retur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.return.post',   'module_code' => 'purchase', 'display_name' => 'Posting Retur Pembelian'],
+            ['group' => 'purchase', 'name' => 'purchase.return.void',   'module_code' => 'purchase', 'display_name' => 'Batalkan Retur Pembelian'],
+
+
+            // Stok Minimum
+            ['group' => 'inventory', 'name' => 'inventory.threshold.view',   'module_code' => 'inventory', 'display_name' => 'Lihat Stok Minimum'],
+            ['group' => 'inventory', 'name' => 'inventory.threshold.update', 'module_code' => 'inventory', 'display_name' => 'Atur Stok Minimum'],
 
             // ------------------------------------------------
             // Dashboard

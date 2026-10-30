@@ -21,6 +21,8 @@ class WarehouseStockListResource extends JsonResource
             'warehouse_id' => $this->warehouse_id,
             'warehouse_name' => $this->warehouse_name,
             'quantity' => $this->quantity,
+            'base_unit_name' => $this->base_unit_name,
+            'base_unit_code' => $this->base_unit_code,
             'avg_cost' => $this->avg_cost,
             'last_mutated_at' => $this->last_mutated_at,
         ];

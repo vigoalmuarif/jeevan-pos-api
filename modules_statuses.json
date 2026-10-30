@@ -8,5 +8,6 @@
     "Product": true,
     "Inventory": true,
     "Partner": true,
-    "Purchase": true
+    "Purchase": true,
+    "ExtPurchaseRequest": true
 }

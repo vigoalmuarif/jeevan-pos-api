@@ -31,7 +31,10 @@
         "psr-4": {
             "App\\": "app/",
             "Database\\Factories\\": "database/factories/",
-            "Database\\Seeders\\": "database/seeders/"
+            "Database\\Seeders\\": "database/seeders/",
+            "files": [
+                "Modules/Product/Helpers/helpers.php"
+            ]
         }
     },
     "autoload-dev": {
@@ -80,7 +83,7 @@
         "laravel": {
             "dont-discover": []
         },
-         "merge-plugin": {
+        "merge-plugin": {
             "include": [
                 "Modules/*/composer.json"
             ]

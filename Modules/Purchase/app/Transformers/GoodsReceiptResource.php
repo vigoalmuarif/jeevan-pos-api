@@ -13,6 +13,11 @@ class GoodsReceiptResource extends JsonResource
             'id' => $this->id,
             'document_number' => $this->document_number,
             'purchase_order_id' => $this->purchase_order_id,
+            'purchase_order' => $this->purchaseOrder ? [
+                'id' => $this->purchaseOrder->id,
+                'document_number' => $this->purchaseOrder->document_number,
+                'order_date' => $this->purchaseOrder->order_date?->toDateString(),
+            ] : null,
             'supplier_id' => $this->supplier_id,
             'supplier_name' => $this->supplier?->name,
             'warehouse_id' => $this->warehouse_id,

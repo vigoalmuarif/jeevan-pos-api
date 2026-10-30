@@ -21,6 +21,21 @@ class MerchantModule extends BaseModel
         'deactivated_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(function (self $mm) {
+            if ($mm->merchant_id) {
+                app(\Modules\Merchant\Services\ModuleEntitlementService::class)->clearCache($mm->merchant_id);
+            }
+        });
+
+        static::deleted(function (self $mm) {
+            if ($mm->merchant_id) {
+                app(\Modules\Merchant\Services\ModuleEntitlementService::class)->clearCache($mm->merchant_id);
+            }
+        });
+    }
+
     public function module(): BelongsTo
     {
         return $this->belongsTo(Module::class);

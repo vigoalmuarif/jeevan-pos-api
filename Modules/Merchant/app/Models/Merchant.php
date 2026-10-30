@@ -74,18 +74,7 @@ class Merchant extends BaseModel
     // Helpers
     public function hasModule(string $moduleCode): bool
     {
-        return $this->merchantModules()
-            ->whereHas(
-                'module',
-                fn($q) =>
-                $q->where('code', $moduleCode)
-            )
-            ->where('is_active', true)
-            ->where(function ($q) {
-                $q->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
-            ->exists();
+        return app(\Modules\Merchant\Services\ModuleEntitlementService::class)->isEntitled($this, $moduleCode);
     }
 
     public function isActive(): bool

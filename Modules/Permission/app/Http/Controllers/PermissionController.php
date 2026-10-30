@@ -7,6 +7,7 @@ use Modules\Core\Abstracts\BaseController;
 use Modules\Core\Helpers\MerchantContext;
 use Modules\Permission\Http\Requests\StorePermissionRequest;
 use Modules\Permission\Transformers\PermissionResource;
+use Modules\Permission\Database\Seeders\PermissionSeeder;
 use Modules\Permission\Models\Permission;
 use Modules\Permission\Services\RoleService;
 
@@ -29,6 +30,16 @@ class PermissionController extends BaseController
           ->groupBy('group');
 
         return $this->success($permissions);
+    }
+
+    public function sync(): JsonResponse
+    {
+        $count = app(PermissionSeeder::class)->sync();
+
+        return $this->success(
+            ['synced' => $count],
+            'Katalog permission berhasil disinkronkan.'
+        );
     }
 
 }

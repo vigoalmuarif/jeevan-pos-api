@@ -23,6 +23,16 @@ class MerchantContext
         return static::$current?->id;
     }
 
+    public static function ulid(): ?string
+    {
+        return static::$current?->ulid;
+    }
+
+    public static function slug(): ?string
+    {
+        return static::$current?->slug;
+    }
+
     public static function check(): bool
     {
         return static::$current !== null;
@@ -31,6 +41,10 @@ class MerchantContext
     public static function clear(): void
     {
         static::$current = null;
+
+        if (function_exists('app') && app()->bound(\Spatie\Permission\PermissionRegistrar::class)) {
+            app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId(null);
+        }
     }
 
     public static function getOrFail(): Merchant

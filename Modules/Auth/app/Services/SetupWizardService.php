@@ -60,18 +60,11 @@ class SetupWizardService extends BaseService
                 'is_active' => true,
             ]);
 
-            $warehouse = $this->warehouseService->create([
-                'name' => 'Main Warehouse',
-                'code' => 'MAIN',
-                'region_ids' => [$region->id],
-                'is_active' => true,
-            ]);
-
+            // auto nuat branch + warehouse
             $branch = $this->branchService->create([
                 'name' => 'Main Branch',
                 'code' => 'MAIN',
                 'region_id' => $region->id,
-                'warehouse_ids' => [$warehouse->id],
                 'is_main' => true,
                 'is_active' => true,
             ]);

@@ -31,9 +31,13 @@ return Application::configure(basePath: dirname(__DIR__))
         
         $middleware->alias([
             'resolve.merchant' => \Modules\Merchant\Http\Middleware\ResolveMerchant::class,
+            'resolve.merchant_context' => \Modules\Merchant\Http\Middleware\ResolveMerchant::class,
+            'ResolveMerchantContext' => \Modules\Merchant\Http\Middleware\ResolveMerchant::class,
             'merchant.active' => \Modules\Merchant\Http\Middleware\CheckMerchantActive::class,
             'resolve.branch' => \Modules\Operational\Http\Middleware\ResolveBranch::class,
             'module' => \Modules\Merchant\Http\Middleware\CheckModuleAccess::class,
+            'ensure.module' => \Modules\Merchant\Http\Middleware\CheckModuleAccess::class,
+            'EnsureModuleEntitled' => \Modules\Merchant\Http\Middleware\CheckModuleAccess::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
@@ -57,4 +61,5 @@ return Application::configure(basePath: dirname(__DIR__))
                 'errors' => ['document' => [$e->getMessage()]],
             ], 422);
         });
+
     })->create();

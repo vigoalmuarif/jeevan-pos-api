@@ -50,6 +50,7 @@ class GoodsReceiptService
         private readonly PurchaseOrderService $orders,
         private readonly StockService $stock,
         private readonly PurchaseDocumentNumberService $numbers,
+        private readonly PurchaseSettingsResolver $settings,
     ) {}
 
     public function getPaginated(Request $request): LengthAwarePaginator
@@ -92,7 +93,23 @@ class GoodsReceiptService
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
-        return compact('suppliers', 'warehouses');
+        $settings = $this->settings->get();
+
+        $orders = DB::table('purchase_orders')
+            ->where('merchant_id', $merchantId)
+            ->whereIn('status', ['approved', 'partially_received'])
+            ->whereNull('deleted_at')
+            ->orderByDesc('order_date')
+            ->get(['id', 'document_number', 'supplier_id', 'warehouse_id', 'order_date']);
+
+        return [
+            'suppliers' => $suppliers,
+            'warehouses' => $warehouses,
+            'orders' => $orders,
+            'settings' => [
+                'require_po' => $settings->requirePo,
+            ],
+        ];
     }
 
     /** Search active, stock-tracked product variants and their active units for the GR form. */
@@ -246,6 +263,7 @@ class GoodsReceiptService
             ->with([
                 'supplier:id,name,code',
                 'warehouse:id,name,code',
+                'purchaseOrder:id,document_number,order_date',
                 'items.productVariant.product:id,name',
                 'items.unit:id,name,code',
             ])
@@ -255,10 +273,15 @@ class GoodsReceiptService
     public function create(array $data, array $lines): GoodsReceipt
     {
         return DB::transaction(function () use ($data, $lines) {
+            if ($this->settings->get()->requirePo && empty($data['purchase_order_id'])) {
+                throw new PurchaseRuleException('Pengaturan mewajibkan penerimaan barang dibuat dari Purchase Order.');
+            }
+
             $order = $this->loadOrderForReceipt($data['purchase_order_id'] ?? null, (int) $data['supplier_id']);
             $prepared = $this->preparer->prepare($data, $lines, forReceipt: true);
 
             if ($order !== null) {
+                $this->assertNoDraftForOrder($order);
                 $this->assertWithinOrder($order, $prepared->items, lock: false);
             }
 
@@ -285,10 +308,15 @@ class GoodsReceiptService
                 throw new PurchaseRuleException('Hanya penerimaan berstatus draft yang dapat diubah.');
             }
 
+            if ($this->settings->get()->requirePo && empty($data['purchase_order_id'])) {
+                throw new PurchaseRuleException('Pengaturan mewajibkan penerimaan barang dibuat dari Purchase Order.');
+            }
+
             $order = $this->loadOrderForReceipt($data['purchase_order_id'] ?? null, (int) $data['supplier_id']);
             $prepared = $this->preparer->prepare($data, $lines, forReceipt: true);
 
             if ($order !== null) {
+                $this->assertNoDraftForOrder($order, $receipt->getKey());
                 $this->assertWithinOrder($order, $prepared->items, lock: false);
             }
 
@@ -407,6 +435,7 @@ class GoodsReceiptService
                     referenceId: $receipt->id,
                     referenceNumber: $receipt->document_number,
                     notes: "Void {$receipt->document_number}: {$reason}",
+                    reversedUnitCost: (float) $item->unit_cost,
                 );
             }
 
@@ -434,7 +463,8 @@ class GoodsReceiptService
         }
 
         // MerchantScope: PO milik merchant lain tidak akan ditemukan.
-        $order = PurchaseOrder::query()->findOrFail((int) $orderId);
+        // Kunci PO agar pembuatan dua draft untuk PO yang sama berjalan serial.
+        $order = PurchaseOrder::query()->lockForUpdate()->findOrFail((int) $orderId);
 
         if (! $order->status->canReceive()) {
             throw new PurchaseRuleException('PO ini belum disetujui atau sudah tidak dapat menerima barang.');
@@ -444,6 +474,27 @@ class GoodsReceiptService
         }
 
         return $order;
+    }
+
+    /**
+     * Satu PO hanya boleh memiliki satu draft Goods Receipt aktif.
+     * Penerimaan posted tetap boleh lebih dari satu untuk mendukung partial receipt.
+     */
+    private function assertNoDraftForOrder(PurchaseOrder $order, ?int $ignoreReceiptId = null): void
+    {
+        $query = GoodsReceipt::query()
+            ->where('purchase_order_id', $order->getKey())
+            ->where('status', DocumentStatus::Draft->value);
+
+        if ($ignoreReceiptId !== null) {
+            $query->whereKeyNot($ignoreReceiptId);
+        }
+
+        if ($query->exists()) {
+            throw new PurchaseRuleException(
+                "PO {$order->document_number} sudah memiliki draft penerimaan barang. Selesaikan, ubah, atau hapus draft tersebut terlebih dahulu."
+            );
+        }
     }
 
     /**

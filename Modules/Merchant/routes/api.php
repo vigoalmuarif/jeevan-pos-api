@@ -51,15 +51,15 @@ Route::middleware(['auth:employee'])
 });
 
 
-Route::middleware([
-    'auth:merchant',
-])->prefix('merchant')->group(function () {
-
-    Route::post('store',
-        [MerchantController::class, 'store']
-    );
-
-});
+foreach (['v1/merchants/{merchant}', 'merchants/{merchant}'] as $prefix) {
+    Route::middleware([
+        'resolve.merchant',
+        'merchant.active',
+        'auth:merchant',
+    ])->prefix($prefix)->group(function () {
+        Route::get('context', [MerchantController::class, 'context']);
+    });
+}
 
 Route::middleware([
     'resolve.merchant',

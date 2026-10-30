@@ -11,6 +11,7 @@
     7 => 'Modules\\Product\\Providers\\ProductServiceProvider',
     8 => 'Modules\\Purchase\\Providers\\PurchaseServiceProvider',
     9 => 'Modules\\User\\Providers\\UserServiceProvider',
+    10 => 'Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider',
   ),
   'eager' => 
   array (
@@ -24,6 +25,7 @@
     7 => 'Modules\\Product\\Providers\\ProductServiceProvider',
     8 => 'Modules\\Purchase\\Providers\\PurchaseServiceProvider',
     9 => 'Modules\\User\\Providers\\UserServiceProvider',
+    10 => 'Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider',
   ),
   'deferred' => 
   array (

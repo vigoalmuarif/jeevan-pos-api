@@ -34,6 +34,25 @@ class CoreServiceProvider extends ModuleServiceProvider
         RouteServiceProvider::class,
     ];
 
+    public function boot(): void
+    {
+        parent::boot();
+
+        $this->app->terminating(function () {
+            \Modules\Core\Helpers\MerchantContext::clear();
+        });
+
+        if ($this->app->bound('queue')) {
+            $queue = $this->app['queue'];
+            $queue->after(function () {
+                \Modules\Core\Helpers\MerchantContext::clear();
+            });
+            $queue->failing(function () {
+                \Modules\Core\Helpers\MerchantContext::clear();
+            });
+        }
+    }
+
     /**
      * Define module schedules.
      * 

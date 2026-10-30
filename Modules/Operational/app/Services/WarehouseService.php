@@ -12,6 +12,7 @@ use Modules\Core\Abstracts\BaseService;
 use Modules\Core\Helpers\MerchantContext;
 use Modules\Core\Support\DataTableConfig;
 use Modules\Core\Support\ServerSideTable;
+use Modules\Operational\Models\Branch;
 use Spatie\QueryBuilder\AllowedFilter;
 
 class WarehouseService extends BaseService
@@ -33,9 +34,9 @@ class WarehouseService extends BaseService
             ],
             allowedFilters: [
                 AllowedFilter::exact('is_active'),
-                AllowedFilter::callback('branch_id', fn ($query, $value) => $query->whereHas(
+                AllowedFilter::callback('branch_id', fn($query, $value) => $query->whereHas(
                     'branches',
-                    fn ($branches) => $branches->where('branches.id', $value)
+                    fn($branches) => $branches->where('branches.id', $value)
                 )),
             ],
             with: ['branches:id,name,code', 'regions:id,name,code,type'],
@@ -55,17 +56,31 @@ class WarehouseService extends BaseService
                 $join->on('wr.warehouse_id', '=', 'w.id')
                     ->where('wr.merchant_id', '=', MerchantContext::id());
             })
+            ->leftJoin('branch_warehouses as bw', function ($join) {
+                $join->on('bw.warehouse_id', '=', 'w.id')
+                    ->where('bw.merchant_id', '=', MerchantContext::id());
+            })
+            ->leftJoin('branches as b', function ($join) {
+                $join->on('b.id', '=', 'bw.branch_id')
+                    ->whereNull('b.deleted_at');
+            })
             ->where('w.merchant_id', MerchantContext::id())
             ->whereNull('w.deleted_at')
             ->orderBy('w.name')
-            ->get(['w.id', 'w.name', 'w.code', 'w.is_active', 'wr.region_id'])
+            ->get([
+                'w.id', 'w.name', 'w.code', 'w.is_active', 'wr.region_id',
+                'b.id as owner_branch_id', 'b.name as owner_branch_name', 'b.code as owner_branch_code',
+            ])
             ->groupBy('id')
-            ->map(fn ($rows) => [
+            ->map(fn($rows) => [
                 'id' => (int) $rows->first()->id,
                 'name' => $rows->first()->name,
                 'code' => $rows->first()->code,
                 'is_active' => (bool) $rows->first()->is_active,
-                'region_ids' => $rows->pluck('region_id')->filter()->map(fn ($id) => (int) $id)->values()->all(),
+                'region_ids' => $rows->pluck('region_id')->filter()->map(fn($id) => (int) $id)->values()->all(),
+                'owner_branch_id' => $rows->first()->owner_branch_id ? (int) $rows->first()->owner_branch_id : null,
+                'owner_branch_name' => $rows->first()->owner_branch_name,
+                'owner_branch_code' => $rows->first()->owner_branch_code,
             ]);
     }
 
@@ -75,7 +90,7 @@ class WarehouseService extends BaseService
             $warehouse = Warehouse::query()->create([
                 'merchant_id' => MerchantContext::id(),
                 'name' => $data['name'],
-                'slug' => Str::slug($data['name']),
+                'slug' => uniqueSlug('warehouses', $data['name']),
                 'code' => strtoupper($data['code']),
                 'address' => $data['address'] ?? null,
                 'phone' => $data['phone'] ?? null,
@@ -86,6 +101,32 @@ class WarehouseService extends BaseService
 
             return $warehouse->load(['branches:id,name,code', 'regions:id,name,code,type']);
         });
+    }
+
+    public function createDefaultForBranch(Branch $branch): Warehouse
+    {
+        // Kepemilikan cabang disimpan pada pivot branch_warehouses.
+        $existing = $branch->warehouses()
+            ->wherePivot('is_primary', true)
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $warehouse = Warehouse::create([
+            'merchant_id' => $branch->merchant_id,   // sama dengan cabangnya, tidak boleh dari input luar
+            'slug'        => uniqueSlug('warehouses', $branch->name),
+            'code'        => $this->generateCode($branch),
+            'name'        => 'Gudang ' . $branch->name,
+            'is_active'   => true,
+        ]);
+
+        if ($branch->region_id) {
+            $this->syncRegions($warehouse, [(int) $branch->region_id]);
+        }
+
+        return $warehouse;
     }
 
     public function update(
@@ -142,7 +183,7 @@ class WarehouseService extends BaseService
         }
 
         $warehouse->regions()->sync(collect($regionIds)->mapWithKeys(
-            fn (int $regionId) => [$regionId => ['merchant_id' => $merchantId]]
+            fn(int $regionId) => [$regionId => ['merchant_id' => $merchantId]]
         )->all());
     }
 
@@ -165,7 +206,8 @@ class WarehouseService extends BaseService
             ->where('merchant_id', MerchantContext::id())
             ->where('warehouse_id', $warehouse->id)
             ->where('is_primary', true)
-            ->exists()) {
+            ->exists()
+        ) {
             throw ValidationException::withMessages([
                 'warehouse' => '👑 Mau lengser boleh, tapi mahkotanya dipindahin dulu yaa',
             ]);
@@ -178,5 +220,21 @@ class WarehouseService extends BaseService
         // Nanti dicek saat module Inventory sudah ada
         // $hasInventory = $warehouse->inventories()->exists();
         // if ($hasInventory) { throw ... }
+    }
+
+
+    /**
+     * Kode unik per merchant, contoh: WH-JKT01-001.
+     * Dihitung per cabang supaya urutannya tidak melompat antar cabang.
+     */
+    private function generateCode(Branch $branch): string
+    {
+        $prefix = 'WH-' . $branch->code . '-';
+        $sequence = Warehouse::withTrashed()
+            ->where('merchant_id', $branch->merchant_id)
+            ->where('code', 'like', $prefix . '%')
+            ->count() + 1;
+
+        return sprintf('WH-%s-%03d', $branch->code, $sequence);
     }
 }

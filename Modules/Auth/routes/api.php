@@ -8,24 +8,25 @@ use Modules\Auth\Http\Controllers\SetupWizardController;
 
 /*
 |------------------------------------------------------------------
-| Merchant Auth — domain utama (jeevan.com)
+| Merchant Auth — v1 & standard
 |------------------------------------------------------------------
 */
-Route::prefix('auth')->group(function () {
+foreach (['v1/auth', 'auth'] as $prefix) {
+    Route::prefix($prefix)->group(function () {
+        // Public
+        Route::post('register',              [RegisterController::class, 'register']);
+        Route::get('register/check-slug',    [RegisterController::class, 'checkSlug']);
+        Route::post('login',                 [AuthController::class, 'login'])->middleware('web');
+        Route::post('select-branch',         [AuthController::class, 'selectBranch']);
 
-    // Public
-    Route::post('register',              [RegisterController::class, 'register']);
-    Route::get('register/check-slug',    [RegisterController::class, 'checkSlug']);
-    Route::post('login',                 [AuthController::class, 'login'])->middleware('web');
-    Route::post('select-branch',         [AuthController::class, 'selectBranch']);
-
-    // Authenticated
-    Route::middleware(['auth:merchant'])->group(function () {
-        Route::post('setup-wizard', [SetupWizardController::class, 'setup']);
-        Route::post('logout', [AuthController::class, 'logout']);
-        Route::get('me', [AuthController::class, 'me']);
+        // Authenticated
+        Route::middleware(['auth:merchant'])->group(function () {
+            Route::post('setup-wizard', [SetupWizardController::class, 'setup']);
+            Route::post('logout', [AuthController::class, 'logout']);
+            Route::get('me', [AuthController::class, 'me']);
+        });
     });
-});
+}
 
 /*
 |------------------------------------------------------------------

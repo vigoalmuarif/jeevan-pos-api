@@ -18,6 +18,7 @@ class StoreGoodsReceiptRequest extends FormRequest
         $merchantId = MerchantContext::id();
 
         return [
+            'purchase_order_id' => ['nullable', 'integer', Rule::exists('purchase_orders', 'id')->where('merchant_id', $merchantId)->whereNull('deleted_at')],
             'supplier_id' => ['required', 'integer', 'min:1', Rule::exists('suppliers', 'id')->where('merchant_id', $merchantId)->where('is_active', true)->whereNull('deleted_at')],
             'warehouse_id' => ['required', 'integer', 'min:1', Rule::exists('warehouses', 'id')->where('merchant_id', $merchantId)->where('is_active', true)->whereNull('deleted_at')],
             'receipt_date' => ['required', 'date'],
@@ -27,6 +28,7 @@ class StoreGoodsReceiptRequest extends FormRequest
             'discount_value' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'items' => ['required', 'array', 'min:1'],
+            'items.*.purchase_order_item_id' => ['nullable', 'integer'],
             'items.*.product_variant_id' => ['required', 'integer', 'min:1'],
             'items.*.unit_id' => ['required', 'integer', 'min:1'],
             'items.*.unit_quantity' => ['required', 'numeric', 'gt:0'],

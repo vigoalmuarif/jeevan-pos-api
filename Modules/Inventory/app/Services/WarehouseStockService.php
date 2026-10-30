@@ -24,7 +24,7 @@ class WarehouseStockService
             allowedFields: [
                 'id', 'product_id', 'product_name', 'product_variant_id', 'variant_name', 'sku',
                 'branch_id', 'branch_name', 'warehouse_id', 'warehouse_name',
-                'quantity', 'avg_cost', 'last_mutated_at',
+                'quantity', 'base_unit_name', 'base_unit_code', 'avg_cost', 'last_mutated_at',
             ],
             allowedFilters: [
                 AllowedFilter::exact('branch_id', 'branches.id'),
@@ -40,6 +40,12 @@ class WarehouseStockService
             ->join('branch_warehouses', 'branch_warehouses.warehouse_id', '=', 'warehouses.id')
             ->join('branches', 'branches.id', '=', 'branch_warehouses.branch_id')
             ->join('product_variants', 'product_variants.id', '=', 'warehouse_stocks.product_variant_id')
+            ->join('product_variant_units as base_units', function ($join) {
+                $join->on('base_units.product_variant_id', '=', 'product_variants.id')
+                    ->where('base_units.is_base', true)
+                    ->whereNull('base_units.deleted_at');
+            })
+            ->join('units as base_unit', 'base_unit.id', '=', 'base_units.unit_id')
             ->join('products', 'products.id', '=', 'product_variants.product_id')
             ->where('warehouse_stocks.merchant_id', MerchantContext::id())
             ->where('warehouses.merchant_id', MerchantContext::id())
@@ -65,6 +71,8 @@ class WarehouseStockService
                 'warehouses.id as warehouse_id',
                 'warehouses.name as warehouse_name',
                 'warehouse_stocks.quantity',
+                'base_unit.name as base_unit_name',
+                'base_unit.code as base_unit_code',
                 'warehouse_stocks.avg_cost',
                 'warehouse_stocks.last_mutated_at',
             ]);

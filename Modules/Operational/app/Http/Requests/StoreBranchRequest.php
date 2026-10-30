@@ -49,15 +49,16 @@ class StoreBranchRequest extends FormRequest
                     fn ($query) => $query->where('merchant_id', MerchantContext::id())->where('is_active', true)
                 ),
             ],
-            'warehouse_ids' => ['required', 'array', 'min:1'],
-            'warehouse_ids.*' => [
-                'required',
-                'integer',
-                'distinct',
-                Rule::exists('warehouses', 'id')->where(
-                    fn ($query) => $query->where('merchant_id', MerchantContext::id())->whereNull('deleted_at')
-                ),
-            ],
+            // 'warehouse_ids' => ['required', 'array', 'min:1'],
+            // 'warehouse_ids.*' => [
+            //     'required',
+            //     'integer',
+            //     'distinct',
+            //     Rule::exists('warehouses', 'id')->where(
+            //         fn ($query) => $query->where('merchant_id', MerchantContext::id())->whereNull('deleted_at')
+            //     ),
+            // ],
+            'primary_warehouse_id' => ['nullable', 'integer'],
         ];
     }
 
@@ -76,8 +77,8 @@ class StoreBranchRequest extends FormRequest
             'village_code.required' => 'Desa/Kelurahan wajib diisi',
             'region_id.required' => 'Regional cabang wajib dipilih',
             'region_id.exists' => 'Regional cabang tidak aktif atau bukan milik merchant ini',
-            'warehouse_ids.required' => 'Pilih minimal satu gudang untuk cabang ini',
-            'warehouse_ids.min' => 'Pilih minimal satu gudang untuk cabang ini',
+            // 'warehouse_ids.required' => 'Pilih minimal satu gudang untuk cabang ini',
+            // 'warehouse_ids.min' => 'Pilih minimal satu gudang untuk cabang ini',
             'warehouse_ids.*.exists' => 'Gudang tidak tersedia untuk merchant ini',
         ];
     }
