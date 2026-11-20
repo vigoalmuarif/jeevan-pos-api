@@ -87,8 +87,10 @@ class WarehouseService extends BaseService
     public function create(array $data): Warehouse
     {
         return DB::transaction(function () use ($data): Warehouse {
+            $merchantId = (int) MerchantContext::id();
+
             $warehouse = Warehouse::query()->create([
-                'merchant_id' => MerchantContext::id(),
+                'merchant_id' => $merchantId,
                 'name' => $data['name'],
                 'slug' => uniqueSlug('warehouses', $data['name']),
                 'code' => strtoupper($data['code']),
@@ -98,6 +100,51 @@ class WarehouseService extends BaseService
             ]);
 
             $this->syncRegions($warehouse, $data['region_ids']);
+
+            if (!empty($data['branch_id'])) {
+                $branch = Branch::where('merchant_id', $merchantId)
+                    ->where('id', $data['branch_id'])
+                    ->whereNull('deleted_at')
+                    ->firstOrFail();
+
+                if ($branch->region_id && !in_array((int) $branch->region_id, array_map('intval', $data['region_ids']), true)) {
+                    throw ValidationException::withMessages([
+                        'region_ids' => 'Regional gudang harus mencakup regional milik cabang (' . ($branch->region?->name ?? 'Regional Cabang') . ').',
+                    ]);
+                }
+
+                $isPrimary = !empty($data['is_primary']);
+                $hasPrimary = DB::table('branch_warehouses')
+                    ->where('merchant_id', $merchantId)
+                    ->where('branch_id', $branch->id)
+                    ->where('is_primary', true)
+                    ->exists();
+
+                if (!$hasPrimary) {
+                    $isPrimary = true;
+                }
+
+                if ($isPrimary) {
+                    DB::table('branch_warehouses')
+                        ->where('merchant_id', $merchantId)
+                        ->where('branch_id', $branch->id)
+                        ->update(['is_primary' => false]);
+
+                    $branch->warehouses()->attach($warehouse->id, [
+                        'merchant_id' => $merchantId,
+                        'is_primary' => true,
+                        'is_active' => true,
+                    ]);
+
+                    $branch->update(['primary_warehouse_id' => $warehouse->id]);
+                } else {
+                    $branch->warehouses()->attach($warehouse->id, [
+                        'merchant_id' => $merchantId,
+                        'is_primary' => false,
+                        'is_active' => true,
+                    ]);
+                }
+            }
 
             return $warehouse->load(['branches:id,name,code', 'regions:id,name,code,type']);
         });
@@ -134,6 +181,26 @@ class WarehouseService extends BaseService
         array $data
     ): Warehouse {
         return DB::transaction(function () use ($warehouse, $data) {
+            $merchantId = (int) MerchantContext::id();
+
+            // Cegah nonaktifkan gudang utama cabang aktif
+            if (array_key_exists('is_active', $data) && ! $data['is_active']) {
+                $isPrimaryForActiveBranch = DB::table('branch_warehouses as bw')
+                    ->join('branches as b', 'b.id', '=', 'bw.branch_id')
+                    ->where('bw.merchant_id', $merchantId)
+                    ->where('bw.warehouse_id', $warehouse->id)
+                    ->where('bw.is_primary', true)
+                    ->where('b.is_active', true)
+                    ->whereNull('b.deleted_at')
+                    ->exists();
+
+                if ($isPrimaryForActiveBranch) {
+                    throw ValidationException::withMessages([
+                        'is_active' => 'Gudang utama cabang aktif tidak dapat dinonaktifkan. Pindahkan status gudang utama cabang ke gudang lain terlebih dahulu.',
+                    ]);
+                }
+            }
+
             $warehouse->update([
                 'name'    => $data['name'],
                 'slug' => Str::slug($data['name']),
@@ -144,6 +211,69 @@ class WarehouseService extends BaseService
             ]);
 
             $this->syncRegions($warehouse, $data['region_ids']);
+
+            // Sinkronisasi cabang pemilik jika branch_id diberikan dalam payload
+            if (array_key_exists('branch_id', $data)) {
+                $currentPivot = DB::table('branch_warehouses')
+                    ->where('merchant_id', $merchantId)
+                    ->where('warehouse_id', $warehouse->id)
+                    ->first();
+
+                $newBranchId = $data['branch_id'] ? (int) $data['branch_id'] : null;
+                $isPrimary = !empty($data['is_primary']);
+
+                if ($currentPivot && $currentPivot->branch_id !== $newBranchId) {
+                    if ($currentPivot->is_primary) {
+                        throw ValidationException::withMessages([
+                            'branch_id' => 'Gudang ini adalah gudang utama cabang saat ini. Tunjuk gudang utama pengganti di cabang tersebut sebelum memindahkan atau melepas gudang ini.',
+                        ]);
+                    }
+
+                    DB::table('branch_warehouses')
+                        ->where('merchant_id', $merchantId)
+                        ->where('warehouse_id', $warehouse->id)
+                        ->delete();
+                }
+
+                if ($newBranchId) {
+                    $branch = Branch::where('merchant_id', $merchantId)
+                        ->where('id', $newBranchId)
+                        ->whereNull('deleted_at')
+                        ->firstOrFail();
+
+                    if ($branch->region_id && !in_array((int) $branch->region_id, array_map('intval', $data['region_ids']), true)) {
+                        throw ValidationException::withMessages([
+                            'region_ids' => 'Regional gudang harus mencakup regional milik cabang (' . ($branch->region?->name ?? 'Regional Cabang') . ').',
+                        ]);
+                    }
+
+                    if ($isPrimary) {
+                        DB::table('branch_warehouses')
+                            ->where('merchant_id', $merchantId)
+                            ->where('branch_id', $branch->id)
+                            ->where('warehouse_id', '!=', $warehouse->id)
+                            ->update(['is_primary' => false]);
+
+                        DB::table('branch_warehouses')->updateOrInsert(
+                            ['merchant_id' => $merchantId, 'branch_id' => $branch->id, 'warehouse_id' => $warehouse->id],
+                            ['is_primary' => true, 'is_active' => true, 'updated_at' => now()]
+                        );
+
+                        $branch->update(['primary_warehouse_id' => $warehouse->id]);
+                    } else {
+                        if ($currentPivot && $currentPivot->branch_id === $newBranchId && $currentPivot->is_primary) {
+                            throw ValidationException::withMessages([
+                                'is_primary' => 'Cabang wajib memiliki satu gudang utama. Untuk menggantinya, pilih gudang lain sebagai gudang utama di menu Cabang.',
+                            ]);
+                        }
+
+                        DB::table('branch_warehouses')->updateOrInsert(
+                            ['merchant_id' => $merchantId, 'branch_id' => $branch->id, 'warehouse_id' => $warehouse->id],
+                            ['is_primary' => false, 'is_active' => true, 'updated_at' => now()]
+                        );
+                    }
+                }
+            }
 
             return $warehouse->refresh()->load(['branches:id,name,code', 'regions:id,name,code,type']);
         });
@@ -217,9 +347,32 @@ class WarehouseService extends BaseService
     private function ensureNoInventory(
         Warehouse $warehouse
     ): void {
-        // Nanti dicek saat module Inventory sudah ada
-        // $hasInventory = $warehouse->inventories()->exists();
-        // if ($hasInventory) { throw ... }
+        $hasStock = DB::table('warehouse_stocks')
+            ->where('merchant_id', MerchantContext::id())
+            ->where('warehouse_id', $warehouse->id)
+            ->where('quantity', '!=', 0)
+            ->exists();
+
+        if ($hasStock) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Gudang masih memiliki saldo stok barang. Kosongkan atau transfer stok terlebih dahulu sebelum menghapus.',
+            ]);
+        }
+
+        $hasOpenTransfer = DB::table('stock_transfers')
+            ->where('merchant_id', MerchantContext::id())
+            ->where(function ($query) use ($warehouse) {
+                $query->where('from_warehouse_id', $warehouse->id)
+                    ->orWhere('to_warehouse_id', $warehouse->id);
+            })
+            ->whereIn('status', ['draft', 'shipped'])
+            ->exists();
+
+        if ($hasOpenTransfer) {
+            throw ValidationException::withMessages([
+                'warehouse' => 'Gudang masih terlibat transfer stok aktif. Selesaikan atau batalkan transfer terlebih dahulu sebelum menghapus.',
+            ]);
+        }
     }
 
 

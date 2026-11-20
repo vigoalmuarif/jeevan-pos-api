@@ -36,6 +36,7 @@ class PurchaseReturnResource extends JsonResource
             ] : null,
             'purchase_invoice_id' => $this->purchase_invoice_id,
             'purchase_invoice_number' => $this->purchaseInvoice?->document_number,
+            'purchase_payment_id' => $this->purchase_payment_id,
             'subtotal' => $this->subtotal,
             'tax_amount' => $this->tax_amount,
             'grand_total' => $this->grand_total,

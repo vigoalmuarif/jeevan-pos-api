@@ -13,10 +13,13 @@ use Modules\Core\Helpers\MerchantContext;
 use Modules\Core\Support\DataTableConfig;
 use Modules\Core\Support\ServerSideTable;
 use Modules\Purchase\Enums\DocumentStatus;
+use Modules\Purchase\Enums\PaymentMethod;
 use Modules\Purchase\Enums\PaymentStatus;
+use Modules\Purchase\Enums\SettlementMethod;
 use Modules\Purchase\Exceptions\PurchaseRuleException;
 use Modules\Purchase\Models\GoodsReceipt;
 use Modules\Purchase\Models\PurchaseInvoice;
+use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Support\DueDate;
 use Modules\Purchase\Support\Numeric;
 use Modules\Purchase\Support\PurchaseInvoiceTotals;
@@ -51,6 +54,7 @@ class PurchaseInvoiceService
 
     public function __construct(
         private readonly PurchaseDocumentNumberService $numbers,
+        private readonly PurchasePaymentService $payments,
     ) {}
 
     // -------------------------------------------------------
@@ -194,6 +198,70 @@ class PurchaseInvoiceService
             ->orderBy('pay.payment_date')->orderBy('pay.id')
             ->get();
 
+        $receiptIds = $items->pluck('goods_receipt_id')->unique()->filter()->values();
+
+        $returns = DB::table('purchase_returns as pr')
+            ->leftJoin('goods_receipts as gr', 'gr.id', '=', 'pr.goods_receipt_id')
+            ->leftJoin('purchase_payments as pay', 'pay.id', '=', 'pr.purchase_payment_id')
+            ->where('pr.merchant_id', $merchantId)
+            ->where(function ($query) use ($invoice, $receiptIds) {
+                $query->where('pr.purchase_invoice_id', $invoice->id);
+                if ($receiptIds->isNotEmpty()) {
+                    $query->orWhereIn('pr.goods_receipt_id', $receiptIds);
+                }
+            })
+            ->select([
+                'pr.id',
+                'pr.document_number',
+                'pr.return_date',
+                'pr.status',
+                'pr.settlement_method',
+                'pr.reason_code',
+                'pr.grand_total',
+                'pr.goods_receipt_id',
+                'gr.document_number as goods_receipt_number',
+                'pr.purchase_payment_id',
+                'pay.document_number as payment_document_number',
+                'pay.amount as deducted_amount',
+            ])
+            ->orderByDesc('pr.return_date')->orderByDesc('pr.id')
+            ->get();
+
+        $returnIds = $returns->pluck('id')->all();
+        $returnItems = empty($returnIds)
+            ? collect()
+            : DB::table('purchase_return_items as pri')
+                ->join('product_variants as pv', 'pv.id', '=', 'pri.product_variant_id')
+                ->join('products as p', 'p.id', '=', 'pv.product_id')
+                ->join('units as u', 'u.id', '=', 'pri.unit_id')
+                ->where('pri.merchant_id', $merchantId)
+                ->whereIn('pri.purchase_return_id', $returnIds)
+                ->select([
+                    'pri.id',
+                    'pri.purchase_return_id',
+                    'pri.goods_receipt_item_id',
+                    'pri.product_variant_id',
+                    'p.name as product_name',
+                    'pv.name as variant_name',
+                    'pv.sku',
+                    'u.name as unit_name',
+                    'pri.unit_quantity',
+                    'pri.unit_price',
+                    'pri.subtotal',
+                    'pri.tax_amount',
+                    'pri.line_total',
+                    'pri.reason',
+                ])
+                ->orderBy('pri.id')
+                ->get();
+
+        $returnItemsByReturnId = $returnItems->groupBy('purchase_return_id');
+
+        $returns = $returns->map(function ($ret) use ($returnItemsByReturnId) {
+            $ret->items = $returnItemsByReturnId->get($ret->id, collect())->values();
+            return $ret;
+        });
+
         return [
             'id' => $invoice->id,
             'document_number' => $invoice->document_number,
@@ -229,6 +297,7 @@ class PurchaseInvoiceService
             ])->values(),
             'items' => $items,
             'payments' => $payments,
+            'returns' => $returns,
         ];
     }
 
@@ -406,6 +475,47 @@ class PurchaseInvoiceService
                 'posted_at' => now(),
                 'posted_by' => auth('merchant')->id(),
             ])->save();
+
+            // Otomatis terapkan retur pembelian yang sudah posted untuk GR terkait (jika ada)
+            $receiptIds = $receipts->pluck('id');
+            $pendingReturns = PurchaseReturn::query()
+                ->whereIn('goods_receipt_id', $receiptIds)
+                ->where('status', DocumentStatus::Posted)
+                ->where('settlement_method', SettlementMethod::InvoiceDeduction)
+                ->whereNull('purchase_payment_id')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($pendingReturns as $return) {
+                $return->purchase_invoice_id = $invoice->id;
+                $balance = (string) $invoice->fresh()->balance_amount;
+
+                if (bccomp($balance, '0', 4) > 0) {
+                    $deductAmount = bccomp((string) $return->grand_total, $balance, 4) > 0
+                        ? $balance
+                        : (string) $return->grand_total;
+
+                    if (bccomp($deductAmount, '0', 4) > 0) {
+                        $payment = $this->payments->create(
+                            [
+                                'supplier_id' => $return->supplier_id,
+                                'payment_date' => $return->return_date?->toDateString() ?? today()->toDateString(),
+                                'payment_method' => PaymentMethod::DebitNote->value,
+                                'reference_number' => $return->document_number,
+                                'notes' => "Pemotongan faktur dari Retur Pembelian {$return->document_number}",
+                            ],
+                            [
+                                [
+                                    'purchase_invoice_id' => $invoice->id,
+                                    'amount' => $deductAmount,
+                                ],
+                            ]
+                        );
+                        $return->purchase_payment_id = $payment->id;
+                    }
+                }
+                $return->save();
+            }
 
             return $invoice;
         });

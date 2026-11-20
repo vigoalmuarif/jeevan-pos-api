@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Modules\ExtPurchaseRequest\Http\Requests\CancelPurchaseRequestRequest;
 use Modules\ExtPurchaseRequest\Http\Requests\ConvertPurchaseRequestToOrdersRequest;
+use Modules\ExtPurchaseRequest\Http\Requests\PurchaseRequestProductOptionsRequest;
 use Modules\ExtPurchaseRequest\Http\Requests\RejectPurchaseRequestRequest;
 use Modules\ExtPurchaseRequest\Http\Requests\StorePurchaseRequestRequest;
 use Modules\ExtPurchaseRequest\Services\PurchaseRequestService;
@@ -39,6 +40,13 @@ class PurchaseRequestController extends Controller
     public function options(): JsonResponse
     {
         return response()->json($this->service->getOptions());
+    }
+
+    public function productOptions(PurchaseRequestProductOptionsRequest $request): JsonResponse
+    {
+        return response()->json([
+            'data' => $this->service->searchProductOptions($request->validated()),
+        ]);
     }
 
     public function approvedItems(Request $request): JsonResponse

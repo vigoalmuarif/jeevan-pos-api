@@ -107,15 +107,250 @@ class PurchaseRequestService
             ->orderBy('name')
             ->get(['id', 'name', 'code']);
 
+        $branchWarehouses = DB::table('branch_warehouses')
+            ->where('merchant_id', $merchantId)
+            ->where('is_active', true)
+            ->get(['branch_id', 'warehouse_id', 'is_primary']);
+
         return [
             'warehouses' => $warehouses,
             'branches' => $branches,
+            'branch_warehouses' => $branchWarehouses,
             'suppliers' => $suppliers,
             'settings' => [
                 'request_enabled' => $this->settings->get()->requestEnabled,
                 'separate_approver' => $this->settings->get()->separateApprover,
             ],
         ];
+    }
+
+    /**
+     * Cari produk/varian untuk item PR:
+     * - Menyertakan produk jual (can_be_sold = true, difilter jika cabang punya assortment)
+     * - Menyertakan produk non-jual (can_be_sold = false: bahan baku / packaging / operasional)
+     * - Menyertakan on_hand_stock jika warehouse_id diberikan
+     * - Memfilter exclude_variant_ids agar produk yang sudah dipilih tidak muncul kembali
+     */
+    public function searchProductOptions(array $filters = []): array
+    {
+        $merchantId = $this->requireMerchant();
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        $warehouseId = isset($filters['warehouse_id']) && $filters['warehouse_id'] !== '' ? (int) $filters['warehouse_id'] : null;
+        $branchId = isset($filters['branch_id']) && $filters['branch_id'] !== '' ? (int) $filters['branch_id'] : null;
+        $canBeSold = isset($filters['can_be_sold']) ? filter_var($filters['can_be_sold'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null;
+        $perPage = min(max((int) ($filters['per_page'] ?? 30), 1), 50);
+
+        $excludeVariantIds = collect($filters['exclude_variant_ids'] ?? [])
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $query = DB::table('products as p')
+            ->join('product_variants as pv', 'pv.product_id', '=', 'p.id')
+            ->where('p.merchant_id', $merchantId)
+            ->where('pv.merchant_id', $merchantId)
+            ->where('p.type', 'product')
+            ->where('p.track_stock', true)
+            ->where('p.is_active', true)
+            ->where('pv.is_active', true)
+            ->whereNull('p.deleted_at')
+            ->whereNull('pv.deleted_at')
+            ->whereExists(function ($unitQuery) use ($merchantId) {
+                $unitQuery->selectRaw('1')
+                    ->from('product_variant_units as pvu')
+                    ->join('product_variants as pv_unit', 'pv_unit.id', '=', 'pvu.product_variant_id')
+                    ->join('product_unit_conversions as puc', function ($join) {
+                        $join->on('puc.product_id', '=', 'pv_unit.product_id')
+                            ->on('puc.unit_id', '=', 'pvu.unit_id');
+                    })
+                    ->join('units as u', 'u.id', '=', 'pvu.unit_id')
+                    ->whereColumn('pvu.product_variant_id', 'pv.id')
+                    ->where('pvu.merchant_id', $merchantId)
+                    ->where('pv_unit.merchant_id', $merchantId)
+                    ->where('puc.merchant_id', $merchantId)
+                    ->where('pvu.is_active', true)
+                    ->where('u.is_active', true)
+                    ->whereNull('pvu.deleted_at')
+                    ->whereNull('u.deleted_at')
+                    ->where(function ($q) use ($merchantId) {
+                        $q->whereNull('u.merchant_id')->orWhere('u.merchant_id', $merchantId);
+                    });
+            });
+
+        if ($excludeVariantIds !== []) {
+            $query->whereNotIn('pv.id', $excludeVariantIds);
+        }
+
+        // 1. Validasi relasi Gudang & Cabang jika keduanya dipilih
+        if ($warehouseId !== null && $branchId !== null) {
+            $isLinked = DB::table('branch_warehouses')
+                ->where('merchant_id', $merchantId)
+                ->where('warehouse_id', $warehouseId)
+                ->where('branch_id', $branchId)
+                ->where('is_active', true)
+                ->exists();
+
+            if (! $isLinked) {
+                return [];
+            }
+        }
+
+        // 2. Tentukan target cabang untuk penyaringan produk aktif
+        $targetBranchIds = [];
+        if ($branchId !== null) {
+            $targetBranchIds = [(int) $branchId];
+        } elseif ($warehouseId !== null) {
+            $targetBranchIds = DB::table('branch_warehouses')
+                ->where('merchant_id', $merchantId)
+                ->where('warehouse_id', $warehouseId)
+                ->where('is_active', true)
+                ->pluck('branch_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        // 3. Filter Cabang (Assortment vs Non-Jual):
+        if ($targetBranchIds !== []) {
+            $query->where(function ($sub) use ($merchantId, $targetBranchIds) {
+                // Selalu sertakan produk non-jual (bahan baku/supplies operasional)
+                $sub->where('p.can_be_sold', false);
+
+                // Untuk produk yang dijual, HANYA yang terdaftar di branch_active_products untuk cabang target
+                $sub->orWhere(function ($q) use ($merchantId, $targetBranchIds) {
+                    $q->where('p.can_be_sold', true)
+                        ->whereExists(function ($bap) use ($merchantId, $targetBranchIds) {
+                            $bap->selectRaw('1')
+                                ->from('branch_active_products as bap')
+                                ->whereColumn('bap.product_variant_id', 'pv.id')
+                                ->whereIn('bap.branch_id', $targetBranchIds)
+                                ->where('bap.merchant_id', $merchantId);
+                        });
+                });
+            });
+        }
+
+        // Filter manual can_be_sold jika secara spesifik dikirim
+        if ($canBeSold !== null) {
+            $query->where('p.can_be_sold', $canBeSold);
+        }
+
+        // Filter pencarian (case-insensitive untuk PostgreSQL & SQLite)
+        if ($search !== '') {
+            $lowerSearch = mb_strtolower($search);
+            $like = "%{$lowerSearch}%";
+            $query->where(function ($builder) use ($like) {
+                $builder->whereRaw('LOWER(p.name) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(COALESCE(pv.name, \'\')) LIKE ?', [$like])
+                    ->orWhereRaw('LOWER(pv.sku) LIKE ?', [$like]);
+            });
+        }
+
+        $variants = $query
+            ->select([
+                'pv.id as product_variant_id',
+                'p.id as product_id',
+                'p.name as product_name',
+                'pv.name as variant_name',
+                'pv.sku',
+                'p.can_be_sold',
+            ])
+            ->orderBy('p.name')
+            ->orderBy('pv.sku')
+            ->limit($perPage)
+            ->get();
+
+        if ($variants->isEmpty()) {
+            return [];
+        }
+
+        $variantIds = $variants->pluck('product_variant_id')->all();
+        $productIds = $variants->pluck('product_id')->unique()->all();
+
+        // 1. Ambil konversi satuan
+        $unitsByVariant = DB::table('product_variants as pv')
+            ->join('products as p', 'p.id', '=', 'pv.product_id')
+            ->join('product_variant_units as pvu', 'pvu.product_variant_id', '=', 'pv.id')
+            ->join('product_unit_conversions as puc', function ($join) {
+                $join->on('puc.product_id', '=', 'p.id')
+                    ->on('puc.unit_id', '=', 'pvu.unit_id');
+            })
+            ->join('units as u', 'u.id', '=', 'pvu.unit_id')
+            ->whereIn('pv.id', $variantIds)
+            ->where('p.merchant_id', $merchantId)
+            ->where('pv.merchant_id', $merchantId)
+            ->where('pvu.merchant_id', $merchantId)
+            ->where('puc.merchant_id', $merchantId)
+            ->where(function ($builder) use ($merchantId) {
+                $builder->whereNull('u.merchant_id')->orWhere('u.merchant_id', $merchantId);
+            })
+            ->where('pvu.is_active', true)
+            ->where('u.is_active', true)
+            ->whereNull('pvu.deleted_at')
+            ->whereNull('u.deleted_at')
+            ->select([
+                'pv.id as product_variant_id',
+                'u.id as unit_id',
+                'u.name as unit_name',
+                'u.code as unit_code',
+                'puc.conversion_value as conversion_rate',
+                'puc.is_base',
+                'pvu.cost as unit_cost',
+            ])
+            ->orderByDesc('puc.is_base')
+            ->orderBy('u.name')
+            ->get()
+            ->groupBy('product_variant_id');
+
+        // 2. Ambil saldo stok jika warehouse_id diberikan
+        $stocksByVariant = $warehouseId
+            ? DB::table('warehouse_stocks')
+                ->where('merchant_id', $merchantId)
+                ->where('warehouse_id', $warehouseId)
+                ->whereIn('product_variant_id', $variantIds)
+                ->pluck('quantity', 'product_variant_id')
+            : collect();
+
+        // 3. Ambil supplier utama (jika ada relasi di product_supplier)
+        $suppliersByProduct = DB::table('product_supplier')
+            ->where('merchant_id', $merchantId)
+            ->whereIn('product_id', $productIds)
+            ->orderBy('id')
+            ->get()
+            ->groupBy('product_id');
+
+        return $variants->map(function ($variant) use ($unitsByVariant, $stocksByVariant, $suppliersByProduct, $warehouseId) {
+            $units = ($unitsByVariant->get($variant->product_variant_id) ?? collect())->map(fn ($u) => [
+                'unit_id' => (int) $u->unit_id,
+                'unit_name' => $u->unit_name,
+                'unit_code' => $u->unit_code,
+                'conversion_rate' => (float) $u->conversion_rate,
+                'is_base' => (bool) $u->is_base,
+                'unit_cost' => $u->unit_cost !== null ? (float) $u->unit_cost : 0.0,
+            ])->values()->all();
+
+            $onHandStock = (float) ($stocksByVariant->get($variant->product_variant_id) ?? 0.0);
+            $typeLabel = $variant->can_be_sold ? '[Jual]' : '[Non-Jual]';
+            $stockLabel = $warehouseId ? ' (Stok: ' . rtrim(rtrim(number_format($onHandStock, 4, '.', ''), '0'), '.') . ')' : '';
+            $variantSuffix = $variant->variant_name ? ' / ' . $variant->variant_name : '';
+            $label = "{$variant->product_name}{$variantSuffix} · SKU {$variant->sku} {$typeLabel}{$stockLabel}";
+
+            $suggestedSupplierId = $suppliersByProduct->get($variant->product_id)?->first()?->supplier_id;
+
+            return [
+                'selection' => (string) $variant->product_variant_id,
+                'product_variant_id' => (int) $variant->product_variant_id,
+                'product_id' => (int) $variant->product_id,
+                'product_name' => $variant->product_name,
+                'variant_name' => $variant->variant_name,
+                'sku' => $variant->sku,
+                'can_be_sold' => (bool) $variant->can_be_sold,
+                'on_hand_stock' => $onHandStock,
+                'suggested_supplier_id' => $suggestedSupplierId ? (int) $suggestedSupplierId : null,
+                'label' => $label,
+                'units' => $units,
+            ];
+        })->values()->all();
     }
 
     public function getApprovedItems(array $filters = []): Collection
@@ -571,11 +806,11 @@ class PurchaseRequestService
                 throw ValidationException::withMessages(["items.{$i}.unit_quantity" => 'Jumlah harus angka lebih besar dari 0 (maksimal 4 desimal).']);
             }
 
-            $key = $line['product_variant_id'].':'.$line['unit_id'];
-            if (isset($seen[$key])) {
-                throw ValidationException::withMessages(["items.{$i}.product_variant_id" => 'Produk dengan satuan yang sama sudah ada pada baris lain.']);
+            $variantId = (int) $line['product_variant_id'];
+            if (isset($seen[$variantId])) {
+                throw ValidationException::withMessages(["items.{$i}.product_variant_id" => 'Produk tersebut sudah ada pada baris lain.']);
             }
-            $seen[$key] = true;
+            $seen[$variantId] = true;
 
             $rows[] = [
                 'product_variant_id' => (int) $line['product_variant_id'],

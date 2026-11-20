@@ -4,11 +4,40 @@ namespace Modules\Purchase\Transformers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\DB;
+use Modules\Purchase\Enums\DocumentStatus;
 
 class PurchaseOrderResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $poItemIds = collect($this->items ?? [])->pluck('id')->filter()->all();
+
+        // Hitung kuantitas retur per baris item PO yang sudah diposting
+        $returnedQuantities = empty($poItemIds)
+            ? collect()
+            : DB::table('purchase_return_items as pri')
+                ->join('purchase_returns as pr', 'pr.id', '=', 'pri.purchase_return_id')
+                ->join('goods_receipt_items as gri', 'gri.id', '=', 'pri.goods_receipt_item_id')
+                ->whereIn('gri.purchase_order_item_id', $poItemIds)
+                ->where('pr.status', DocumentStatus::Posted->value)
+                ->whereNull('pr.deleted_at')
+                ->groupBy('gri.purchase_order_item_id')
+                ->selectRaw('gri.purchase_order_item_id, SUM(pri.unit_quantity) as total_returned_unit, SUM(pri.base_quantity) as total_returned_base')
+                ->get()
+                ->keyBy('purchase_order_item_id');
+
+        $receiptIds = collect($this->goodsReceipts ?? [])->pluck('id')->filter()->all();
+        $receiptReturns = empty($receiptIds)
+            ? collect()
+            : DB::table('purchase_returns')
+                ->whereIn('goods_receipt_id', $receiptIds)
+                ->where('status', DocumentStatus::Posted->value)
+                ->whereNull('deleted_at')
+                ->groupBy('goods_receipt_id')
+                ->selectRaw('goods_receipt_id, COUNT(*) as return_count')
+                ->pluck('return_count', 'goods_receipt_id');
+
         return [
             'id' => $this->id,
             'document_number' => $this->document_number,
@@ -37,6 +66,8 @@ class PurchaseOrderResource extends JsonResource
             'cancel_reason' => $this->cancel_reason,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'has_returns' => $returnedQuantities->isNotEmpty(),
+            'total_returned_items' => (float) $returnedQuantities->sum('total_returned_unit'),
             'purchase_requests' => collect($this->items ?? [])
                 ->flatMap(fn ($item) => collect($item->requestLinks ?? [])->map(fn ($link) => $link->requestItem?->purchaseRequest))
                 ->filter()
@@ -47,11 +78,20 @@ class PurchaseOrderResource extends JsonResource
                     'document_number' => $request->document_number,
                     'request_date' => $request->request_date?->toDateString(),
                 ]),
-            'items' => collect($this->items ?? [])->map(function ($item) {
+            'items' => collect($this->items ?? [])->map(function ($item) use ($returnedQuantities) {
                 $rem = bcsub((string) $item->base_quantity, (string) $item->received_base_quantity, 4);
                 $remainingUnitQty = bccomp((string) $item->conversion_rate, '0', 6) > 0
                     ? bcdiv($rem, (string) $item->conversion_rate, 4)
                     : $rem;
+
+                $retRow = $returnedQuantities->get($item->id);
+                $returnedUnitQty = (float) ($retRow->total_returned_unit ?? 0);
+                $returnedBaseQty = (float) ($retRow->total_returned_base ?? 0);
+                $receivedBaseQty = (float) $item->received_base_quantity;
+                $netReceivedBaseQty = max(0, $receivedBaseQty - $returnedBaseQty);
+                $netReceivedUnitQty = bccomp((string) $item->conversion_rate, '0', 6) > 0
+                    ? (float) bcdiv((string) $netReceivedBaseQty, (string) $item->conversion_rate, 4)
+                    : $netReceivedBaseQty;
 
                 return [
                     'id' => $item->id,
@@ -66,6 +106,10 @@ class PurchaseOrderResource extends JsonResource
                     'conversion_rate' => $item->conversion_rate,
                     'base_quantity' => $item->base_quantity,
                     'received_base_quantity' => $item->received_base_quantity,
+                    'returned_unit_quantity' => $returnedUnitQty,
+                    'returned_base_quantity' => $returnedBaseQty,
+                    'net_received_base_quantity' => $netReceivedBaseQty,
+                    'net_received_unit_quantity' => $netReceivedUnitQty,
                     'remaining_base_quantity' => $rem,
                     'remaining_unit_quantity' => $remainingUnitQty,
                     'unit_price' => $item->unit_price,
@@ -83,6 +127,8 @@ class PurchaseOrderResource extends JsonResource
                 'document_number' => $gr->document_number,
                 'status' => $gr->status?->value,
                 'receipt_date' => $gr->receipt_date?->toDateString(),
+                'has_returns' => ($receiptReturns[$gr->id] ?? 0) > 0,
+                'return_count' => (int) ($receiptReturns[$gr->id] ?? 0),
             ])->values(),
         ];
     }

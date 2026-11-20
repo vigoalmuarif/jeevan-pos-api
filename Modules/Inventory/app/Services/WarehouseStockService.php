@@ -29,6 +29,7 @@ class WarehouseStockService
             allowedFilters: [
                 AllowedFilter::exact('branch_id', 'branches.id'),
                 AllowedFilter::exact('warehouse_id', 'warehouses.id'),
+                AllowedFilter::exact('product_id', 'products.id'),
             ],
             allowedSorts: ['products.name', 'product_variants.sku', 'warehouse_stocks.quantity', 'warehouse_stocks.last_mutated_at'],
             searchableColumns: ['products.name', 'product_variants.name', 'product_variants.sku'],

@@ -24,7 +24,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
 
         $middleware->priority([
+            \Illuminate\Auth\Middleware\Authenticate::class,
             \Modules\Merchant\Http\Middleware\ResolveMerchant::class,
+            \Modules\Merchant\Http\Middleware\CheckMerchantActive::class,
             \Modules\Operational\Http\Middleware\ResolveBranch::class,
             SubstituteBindings::class,
         ]);

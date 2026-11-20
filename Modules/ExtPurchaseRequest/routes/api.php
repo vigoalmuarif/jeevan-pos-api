@@ -13,6 +13,9 @@ Route::middleware([
     Route::get('/options', [PurchaseRequestController::class, 'options'])
         ->middleware('role_or_permission:owner|purchase.request.view|purchase.request.create|purchase.request.update');
 
+    Route::get('/product-options', [PurchaseRequestController::class, 'productOptions'])
+        ->middleware('role_or_permission:owner|purchase.request.view|purchase.request.create|purchase.request.update');
+
     Route::get('/approved-items', [PurchaseRequestController::class, 'approvedItems'])
         ->middleware('role_or_permission:owner|purchase.request.view|purchase.request.convert|purchase.order.create');
 

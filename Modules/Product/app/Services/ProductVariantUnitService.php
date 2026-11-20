@@ -3,6 +3,7 @@
 namespace Modules\Product\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Helpers\MerchantContext;
 use Modules\Product\Models\Product;
@@ -97,13 +98,24 @@ class ProductVariantUnitService
             }
 
             if (array_key_exists('conversion_value', $data)) {
-                $conversion->conversion_value = $data['conversion_value'];
-                $conversion->save();
-                ProductVariantUnit::query()
-                    ->where('merchant_id', $merchantId)
-                    ->whereIn('product_variant_id', $product->variants()->pluck('id'))
-                    ->where('unit_id', $unit->unit_id)
-                    ->update(['conversion_value' => $data['conversion_value']]);
+                $variantIds = $product->variants()->pluck('id')->all();
+                $isConversionChanged = abs((float) $data['conversion_value'] - (float) $conversion->conversion_value) > 0.000001;
+
+                if ($isConversionChanged && $this->hasStockMutations($merchantId, $variantIds)) {
+                    throw ValidationException::withMessages([
+                        'conversion_value' => 'Rasio konversi satuan tidak dapat diubah karena produk sudah memiliki riwayat mutasi stok. Tambahkan satuan baru jika diperlukan.',
+                    ]);
+                }
+
+                if ($isConversionChanged) {
+                    $conversion->conversion_value = $data['conversion_value'];
+                    $conversion->save();
+                    ProductVariantUnit::query()
+                        ->where('merchant_id', $merchantId)
+                        ->whereIn('product_variant_id', $variantIds)
+                        ->where('unit_id', $unit->unit_id)
+                        ->update(['conversion_value' => $data['conversion_value']]);
+                }
             }
 
             $unit->fill(array_intersect_key($data, array_flip(['barcode', 'cost', 'default_price', 'is_active'])))->save();
@@ -131,6 +143,18 @@ class ProductVariantUnitService
                 ->where('unit_id', $unit->unit_id)
                 ->delete();
         });
+    }
+
+    private function hasStockMutations(int $merchantId, array $variantIds): bool
+    {
+        if ($variantIds === [] || ! Schema::hasTable('stock_mutations')) {
+            return false;
+        }
+
+        return DB::table('stock_mutations')
+            ->where('merchant_id', $merchantId)
+            ->whereIn('product_variant_id', $variantIds)
+            ->exists();
     }
 
     private function merchantId(): int

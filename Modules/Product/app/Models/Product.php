@@ -18,6 +18,7 @@ class Product extends BaseModel
     {
         return [
             'track_stock' => 'boolean',
+            'can_be_sold' => 'boolean',
             'is_taxable' => 'boolean',
             'tax_rate' => 'decimal:2',
             'min_stock' => 'decimal:4',

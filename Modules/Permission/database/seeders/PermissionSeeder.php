@@ -170,6 +170,12 @@ class PermissionSeeder extends Seeder
             ['group' => 'inventory', 'name' => 'inventory.transfer.ship',    'module_code' => 'inventory', 'display_name' => 'Kirim Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.transfer.receive', 'module_code' => 'inventory', 'display_name' => 'Terima Transfer Stok'],
             ['group' => 'inventory', 'name' => 'inventory.transfer.cancel',  'module_code' => 'inventory', 'display_name' => 'Batalkan Transfer Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.request.view',     'module_code' => 'inventory', 'display_name' => 'Lihat Permintaan Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.request.create',   'module_code' => 'inventory', 'display_name' => 'Buat Permintaan Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.request.update',   'module_code' => 'inventory', 'display_name' => 'Ubah Permintaan Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.request.delete',   'module_code' => 'inventory', 'display_name' => 'Hapus Draft Permintaan Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.request.approve',  'module_code' => 'inventory', 'display_name' => 'Setujui Permintaan Stok'],
+            ['group' => 'inventory', 'name' => 'inventory.request.cancel',   'module_code' => 'inventory', 'display_name' => 'Batalkan Permintaan Stok'],
             ['group' => 'inventory', 'name' => 'inventory.report', 'module_code' => 'inventory',    'display_name' => 'Laporan Stok'],
 
 

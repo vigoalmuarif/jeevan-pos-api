@@ -37,7 +37,7 @@ return [
          * Eloquent model should be used to retrieve your teams. Of course, it
          * is often just the "Team" model but you may use whatever you like.
          */
-        'team' => null,
+        'team' => \Modules\Merchant\Models\Merchant::class,
 
         /*
          * When using the "HasModels" trait and passing raw IDs to syncModels,

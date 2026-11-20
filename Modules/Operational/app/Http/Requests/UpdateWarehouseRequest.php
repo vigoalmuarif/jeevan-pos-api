@@ -35,6 +35,14 @@ class UpdateWarehouseRequest extends FormRequest
             'address' => 'nullable|string',
             'phone'   => 'nullable|string|max:20',
             'is_active'  => 'nullable|boolean',
+            'branch_id'  => [
+                'nullable',
+                'integer',
+                Rule::exists('branches', 'id')->where(
+                    fn ($query) => $query->where('merchant_id', MerchantContext::id())->whereNull('deleted_at')
+                ),
+            ],
+            'is_primary' => 'nullable|boolean',
             'region_ids' => ['required', 'array', 'min:1'],
             'region_ids.*' => [
                 'required',

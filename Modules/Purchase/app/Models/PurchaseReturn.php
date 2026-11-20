@@ -27,7 +27,7 @@ class PurchaseReturn extends BaseModel
 
     protected $fillable = [
         'branch_id', 'document_number', 'supplier_id', 'warehouse_id',
-        'goods_receipt_id', 'purchase_invoice_id', 'return_date',
+        'goods_receipt_id', 'purchase_invoice_id', 'purchase_payment_id', 'return_date',
         'settlement_method', 'reason_code', 'subtotal', 'tax_amount',
         'grand_total', 'notes',
     ];
@@ -76,6 +76,11 @@ class PurchaseReturn extends BaseModel
     public function purchaseInvoice(): BelongsTo
     {
         return $this->belongsTo(PurchaseInvoice::class);
+    }
+
+    public function purchasePayment(): BelongsTo
+    {
+        return $this->belongsTo(PurchasePayment::class);
     }
 
     public function items(): HasMany

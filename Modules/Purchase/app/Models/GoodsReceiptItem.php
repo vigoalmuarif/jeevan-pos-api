@@ -3,6 +3,7 @@
 namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Abstracts\BaseModel;
 use Modules\Core\Traits\BelongsToMerchant;
 use Modules\Product\Models\ProductVariant;
@@ -68,5 +69,10 @@ class GoodsReceiptItem extends BaseModel
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function purchaseReturnItems(): HasMany
+    {
+        return $this->hasMany(PurchaseReturnItem::class);
     }
 }

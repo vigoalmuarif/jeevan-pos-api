@@ -266,6 +266,12 @@ class GoodsReceiptService
                 'purchaseOrder:id,document_number,order_date',
                 'items.productVariant.product:id,name',
                 'items.unit:id,name,code',
+                'purchaseReturns' => fn ($q) => $q->select([
+                    'id', 'merchant_id', 'goods_receipt_id', 'document_number',
+                    'return_date', 'status', 'settlement_method', 'reason_code', 'grand_total',
+                ])->orderByDesc('return_date')->orderByDesc('id'),
+                'purchaseReturns.items.productVariant.product:id,name',
+                'purchaseReturns.items.unit:id,name,code',
             ])
             ->findOrFail($id);
     }

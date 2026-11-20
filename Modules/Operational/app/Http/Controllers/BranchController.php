@@ -26,7 +26,7 @@ class BranchController extends BaseController
 
     public function forComboBox(Request $request): JsonResponse
     {
-        $branches = Branch::select('id', 'name', 'code')
+        $branches = Branch::select('id', 'name', 'code', 'region_id')
             ->when(isset($request->perPage), function($q) use ($request){
                 $q->limit($request->perPage);
             })

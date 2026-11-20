@@ -9,10 +9,15 @@ use Modules\Core\Helpers\MerchantContext;
 use Modules\Inventory\Services\StockService;
 use Modules\Merchant\Models\Merchant;
 use Modules\Purchase\Enums\DocumentStatus;
+use Modules\Purchase\Enums\PaymentMethod;
+use Modules\Purchase\Enums\PaymentStatus;
 use Modules\Purchase\Enums\ReturnReason;
 use Modules\Purchase\Enums\SettlementMethod;
 use Modules\Purchase\Models\GoodsReceipt;
 use Modules\Purchase\Models\GoodsReceiptItem;
+use Modules\Purchase\Models\PurchaseInvoice;
+use Modules\Purchase\Models\PurchasePayment;
+use Modules\Purchase\Services\PurchaseInvoiceService;
 use Modules\Purchase\Services\PurchaseReturnService;
 use Tests\TestCase;
 
@@ -219,9 +224,225 @@ class PurchaseReturnTest extends TestCase
         );
     }
 
+    public function test_posting_return_with_invoice_deduction_reduces_invoice_balance(): void
+    {
+        // 1. Setup GR 10 pcs @ 150 = 1500
+        $receiptId = DB::table('goods_receipts')->insertGetId([
+            'merchant_id' => 1,
+            'branch_id' => 1,
+            'supplier_id' => 1,
+            'warehouse_id' => 1,
+            'document_number' => 'GR-202610-0010',
+            'receipt_date' => '2026-10-25',
+            'status' => 'posted',
+            'grand_total' => 1500,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $receiptItemId = DB::table('goods_receipt_items')->insertGetId([
+            'merchant_id' => 1,
+            'goods_receipt_id' => $receiptId,
+            'product_variant_id' => 1,
+            'unit_id' => 1,
+            'unit_quantity' => 10,
+            'conversion_rate' => 1,
+            'base_quantity' => 10,
+            'unit_price' => 150,
+            'unit_cost' => 150,
+            'subtotal' => 1500,
+            'tax_rate' => 0,
+            'tax_amount' => 0,
+            'line_total' => 1500,
+            'cost_amount' => 1500,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::transaction(function () {
+            app(StockService::class)->recordMutation(
+                warehouseId: 1,
+                productVariantId: 1,
+                baseQuantity: 10,
+                mutationType: 'purchase_receipt',
+                incomingUnitCost: 150,
+            );
+        });
+
+        // 2. Buat Purchase Invoice berstatus Posted untuk GR tersebut
+        $invoiceId = DB::table('purchase_invoices')->insertGetId([
+            'merchant_id' => 1,
+            'branch_id' => 1,
+            'supplier_id' => 1,
+            'document_number' => 'INV-202610-0001',
+            'supplier_invoice_number' => 'SUP-INV-001',
+            'invoice_date' => '2026-10-25',
+            'status' => 'posted',
+            'items_subtotal' => 1500,
+            'grand_total' => 1500,
+            'paid_amount' => 0,
+            'payment_status' => 'unpaid',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('goods_receipts')->where('id', $receiptId)->update(['purchase_invoice_id' => $invoiceId]);
+
+        // 3. Buat dan Post Purchase Return senilai 450 (3 pcs @ 150)
+        $service = app(PurchaseReturnService::class);
+        $return = $service->create(
+            [
+                'goods_receipt_id' => $receiptId,
+                'branch_id' => 1,
+                'return_date' => '2026-10-26',
+                'settlement_method' => SettlementMethod::InvoiceDeduction->value,
+                'reason_code' => ReturnReason::Damaged->value,
+            ],
+            [
+                [
+                    'goods_receipt_item_id' => $receiptItemId,
+                    'unit_quantity' => 3,
+                ],
+            ]
+        );
+
+        $postedReturn = $service->post($return->id);
+
+        // Assert posting retur berhasil mengaitkan faktur dan pembayaran Debit Note
+        $this->assertSame(DocumentStatus::Posted, $postedReturn->status);
+        $this->assertSame($invoiceId, $postedReturn->purchase_invoice_id);
+        $this->assertNotNull($postedReturn->purchase_payment_id);
+
+        // Assert pembayaran debit note
+        $payment = PurchasePayment::query()->findOrFail($postedReturn->purchase_payment_id);
+        $this->assertSame(DocumentStatus::Posted, $payment->status);
+        $this->assertSame(PaymentMethod::DebitNote, $payment->payment_method);
+        $this->assertSame(450.0, (float) $payment->amount);
+
+        // Assert faktur terpotong saldonya: paid_amount = 450, balance_amount = 1050, status = partial
+        $invoice = PurchaseInvoice::query()->findOrFail($invoiceId);
+        $this->assertSame(450.0, (float) $invoice->paid_amount);
+        $this->assertSame(1050.0, (float) $invoice->balance_amount);
+        $this->assertSame(PaymentStatus::Partial, $invoice->payment_status);
+
+        // 4. Void Purchase Return
+        $service->void($postedReturn->id, 'Batal retur');
+
+        // Assert pembayaran debit note dibatalkan
+        $payment->refresh();
+        $this->assertSame(DocumentStatus::Voided, $payment->status);
+
+        // Assert saldo faktur dipulihkan utuh kembali
+        $invoice->refresh();
+        $this->assertSame(0.0, (float) $invoice->paid_amount);
+        $this->assertSame(1500.0, (float) $invoice->balance_amount);
+        $this->assertSame(PaymentStatus::Unpaid, $invoice->payment_status);
+    }
+
+    public function test_posting_invoice_automatically_allocates_posted_returns_with_invoice_deduction(): void
+    {
+        // 1. Setup GR 10 pcs @ 150 = 1500 (belum difakturkan)
+        $receiptId = DB::table('goods_receipts')->insertGetId([
+            'merchant_id' => 1,
+            'branch_id' => 1,
+            'supplier_id' => 1,
+            'warehouse_id' => 1,
+            'document_number' => 'GR-202610-0020',
+            'receipt_date' => '2026-10-25',
+            'status' => 'posted',
+            'items_subtotal' => 1500,
+            'discount_amount' => 0,
+            'tax_amount' => 0,
+            'grand_total' => 1500,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $receiptItemId = DB::table('goods_receipt_items')->insertGetId([
+            'merchant_id' => 1,
+            'goods_receipt_id' => $receiptId,
+            'product_variant_id' => 1,
+            'unit_id' => 1,
+            'unit_quantity' => 10,
+            'conversion_rate' => 1,
+            'base_quantity' => 10,
+            'unit_price' => 150,
+            'unit_cost' => 150,
+            'subtotal' => 1500,
+            'discount_amount' => 0,
+            'allocated_discount_amount' => 0,
+            'tax_rate' => 0,
+            'tax_amount' => 0,
+            'line_total' => 1500,
+            'cost_amount' => 1500,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::transaction(function () {
+            app(StockService::class)->recordMutation(
+                warehouseId: 1,
+                productVariantId: 1,
+                baseQuantity: 10,
+                mutationType: 'purchase_receipt',
+                incomingUnitCost: 150,
+            );
+        });
+
+        // 2. Buat dan Post Purchase Return DULU senilai 300 (2 pcs @ 150)
+        $returnService = app(PurchaseReturnService::class);
+        $return = $returnService->create(
+            [
+                'goods_receipt_id' => $receiptId,
+                'branch_id' => 1,
+                'return_date' => '2026-10-26',
+                'settlement_method' => SettlementMethod::InvoiceDeduction->value,
+                'reason_code' => ReturnReason::Damaged->value,
+            ],
+            [
+                [
+                    'goods_receipt_item_id' => $receiptItemId,
+                    'unit_quantity' => 2,
+                ],
+            ]
+        );
+
+        $postedReturn = $returnService->post($return->id);
+        $this->assertSame(DocumentStatus::Posted, $postedReturn->status);
+        $this->assertNull($postedReturn->purchase_invoice_id);
+        $this->assertNull($postedReturn->purchase_payment_id);
+
+        // 3. Faktur dibuat dan diposting kemudian untuk GR ini
+        $invoiceService = app(PurchaseInvoiceService::class);
+        $draftInvoice = $invoiceService->create([
+            'supplier_id' => 1,
+            'branch_id' => 1,
+            'supplier_invoice_number' => 'SUP-INV-002',
+            'invoice_date' => '2026-10-27',
+        ], [$receiptId]);
+
+        $this->assertSame(1500.0, (float) $draftInvoice->grand_total);
+        $this->assertSame(0.0, (float) $draftInvoice->paid_amount);
+
+        // Posting Faktur
+        $postedInvoice = $invoiceService->post($draftInvoice->id);
+
+        // Assert: Retur otomatis dialokasikan ke faktur
+        $postedReturn->refresh();
+        $this->assertSame($postedInvoice->id, $postedReturn->purchase_invoice_id);
+        $this->assertNotNull($postedReturn->purchase_payment_id);
+
+        // Assert: Sisa hutang faktur langsung terpotong 300
+        $postedInvoice->refresh();
+        $this->assertSame(300.0, (float) $postedInvoice->paid_amount);
+        $this->assertSame(1200.0, (float) $postedInvoice->balance_amount);
+        $this->assertSame(PaymentStatus::Partial, $postedInvoice->payment_status);
+    }
+
     private function createSchema(): void
     {
         foreach ([
+            'purchase_payment_allocations', 'purchase_payments',
             'purchase_return_items', 'purchase_returns',
             'purchase_invoice_items', 'purchase_invoices',
             'goods_receipt_items', 'goods_receipts',
@@ -263,13 +484,25 @@ class PurchaseReturnTest extends TestCase
             $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('warehouse_id'); $table->unsignedBigInteger('product_variant_id'); $table->string('mutation_type'); $table->decimal('quantity', 18, 4); $table->decimal('quantity_before', 18, 4); $table->decimal('quantity_after', 18, 4); $table->decimal('unit_cost', 18, 4)->default(0); $table->decimal('total_cost', 18, 4)->default(0); $table->decimal('avg_cost_after', 18, 4)->default(0); $table->string('reference_type')->nullable(); $table->unsignedBigInteger('reference_id')->nullable(); $table->string('reference_number')->nullable(); $table->text('notes')->nullable(); $table->timestamp('mutated_at'); $table->unsignedBigInteger('created_by')->nullable(); $table->timestamp('created_at');
         });
         Schema::create('goods_receipts', function (Blueprint $table) {
-            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('branch_id')->nullable(); $table->unsignedBigInteger('supplier_id'); $table->unsignedBigInteger('warehouse_id'); $table->unsignedBigInteger('purchase_order_id')->nullable(); $table->unsignedBigInteger('purchase_invoice_id')->nullable(); $table->string('document_number'); $table->date('receipt_date'); $table->string('delivery_note_number')->nullable(); $table->string('status')->default('draft'); $table->decimal('grand_total', 18, 4)->default(0); $table->text('notes')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamp('voided_at')->nullable(); $table->unsignedBigInteger('voided_by')->nullable(); $table->string('void_reason')->nullable(); $table->timestamps(); $table->softDeletes();
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('branch_id')->nullable(); $table->unsignedBigInteger('supplier_id'); $table->unsignedBigInteger('warehouse_id'); $table->unsignedBigInteger('purchase_order_id')->nullable(); $table->unsignedBigInteger('purchase_invoice_id')->nullable(); $table->string('document_number'); $table->date('receipt_date'); $table->string('delivery_note_number')->nullable(); $table->string('status')->default('draft'); $table->decimal('items_subtotal', 18, 4)->default(0); $table->decimal('discount_amount', 18, 4)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('grand_total', 18, 4)->default(0); $table->text('notes')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamp('voided_at')->nullable(); $table->unsignedBigInteger('voided_by')->nullable(); $table->string('void_reason')->nullable(); $table->timestamps(); $table->softDeletes();
         });
         Schema::create('goods_receipt_items', function (Blueprint $table) {
-            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('goods_receipt_id'); $table->unsignedBigInteger('product_variant_id'); $table->unsignedBigInteger('unit_id'); $table->decimal('unit_quantity', 18, 4); $table->decimal('conversion_rate', 18, 6)->default(1); $table->decimal('base_quantity', 18, 4); $table->decimal('unit_price', 18, 4); $table->decimal('unit_cost', 18, 4); $table->decimal('subtotal', 18, 4); $table->decimal('tax_rate', 5, 2)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('line_total', 18, 4); $table->decimal('cost_amount', 18, 4); $table->timestamps();
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('goods_receipt_id'); $table->unsignedBigInteger('product_variant_id'); $table->unsignedBigInteger('unit_id'); $table->decimal('unit_quantity', 18, 4); $table->decimal('conversion_rate', 18, 6)->default(1); $table->decimal('base_quantity', 18, 4); $table->decimal('unit_price', 18, 4); $table->decimal('unit_cost', 18, 4); $table->decimal('subtotal', 18, 4); $table->decimal('discount_amount', 18, 4)->default(0); $table->decimal('allocated_discount_amount', 18, 4)->default(0); $table->decimal('tax_rate', 5, 2)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('line_total', 18, 4); $table->decimal('cost_amount', 18, 4); $table->timestamps();
+        });
+        Schema::create('purchase_invoices', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('branch_id')->nullable(); $table->string('document_number', 50); $table->unsignedBigInteger('supplier_id'); $table->string('supplier_invoice_number', 50)->nullable(); $table->date('invoice_date'); $table->date('due_date')->nullable(); $table->string('status', 20)->default('draft'); $table->decimal('items_subtotal', 18, 4)->default(0); $table->decimal('discount_amount', 18, 4)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('rounding_amount', 18, 4)->default(0); $table->decimal('grand_total', 18, 4)->default(0); $table->decimal('paid_amount', 18, 4)->default(0); $table->decimal('balance_amount', 18, 4)->storedAs('grand_total - paid_amount'); $table->string('payment_status', 10)->default('unpaid'); $table->text('notes')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamp('voided_at')->nullable(); $table->unsignedBigInteger('voided_by')->nullable(); $table->string('void_reason')->nullable(); $table->unsignedBigInteger('created_by')->nullable(); $table->unsignedBigInteger('updated_by')->nullable(); $table->timestamps(); $table->softDeletes();
+        });
+        Schema::create('purchase_invoice_items', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('purchase_invoice_id'); $table->unsignedBigInteger('goods_receipt_id'); $table->unsignedBigInteger('goods_receipt_item_id'); $table->unsignedBigInteger('product_variant_id'); $table->unsignedBigInteger('unit_id'); $table->decimal('unit_quantity', 18, 4); $table->decimal('unit_price', 18, 4); $table->decimal('discount_amount', 18, 4)->default(0); $table->decimal('allocated_discount_amount', 18, 4)->default(0); $table->decimal('tax_rate', 5, 2)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('subtotal', 18, 4); $table->decimal('line_total', 18, 4); $table->timestamps();
+        });
+        Schema::create('purchase_payments', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->string('document_number', 50); $table->unsignedBigInteger('supplier_id'); $table->date('payment_date'); $table->string('payment_method', 30); $table->decimal('amount', 18, 4); $table->string('reference_number', 50)->nullable(); $table->text('notes')->nullable(); $table->string('status', 10)->default('posted'); $table->timestamp('voided_at')->nullable(); $table->unsignedBigInteger('voided_by')->nullable(); $table->string('void_reason')->nullable(); $table->unsignedBigInteger('created_by')->nullable(); $table->unsignedBigInteger('updated_by')->nullable(); $table->timestamps();
+        });
+        Schema::create('purchase_payment_allocations', function (Blueprint $table) {
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('purchase_payment_id'); $table->unsignedBigInteger('purchase_invoice_id'); $table->decimal('amount', 18, 4); $table->timestamps();
         });
         Schema::create('purchase_returns', function (Blueprint $table) {
-            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('branch_id')->nullable(); $table->unsignedBigInteger('supplier_id'); $table->unsignedBigInteger('warehouse_id'); $table->unsignedBigInteger('goods_receipt_id'); $table->unsignedBigInteger('purchase_invoice_id')->nullable(); $table->string('document_number'); $table->date('return_date'); $table->string('status')->default('draft'); $table->string('settlement_method')->default('invoice_deduction'); $table->string('reason_code')->default('damaged'); $table->decimal('subtotal', 18, 4)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('grand_total', 18, 4)->default(0); $table->text('notes')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamp('voided_at')->nullable(); $table->unsignedBigInteger('voided_by')->nullable(); $table->string('void_reason')->nullable(); $table->timestamps(); $table->softDeletes();
+            $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('branch_id')->nullable(); $table->unsignedBigInteger('supplier_id'); $table->unsignedBigInteger('warehouse_id'); $table->unsignedBigInteger('goods_receipt_id'); $table->unsignedBigInteger('purchase_invoice_id')->nullable(); $table->unsignedBigInteger('purchase_payment_id')->nullable(); $table->string('document_number'); $table->date('return_date'); $table->string('status')->default('draft'); $table->string('settlement_method')->default('invoice_deduction'); $table->string('reason_code')->default('damaged'); $table->decimal('subtotal', 18, 4)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('grand_total', 18, 4)->default(0); $table->text('notes')->nullable(); $table->timestamp('posted_at')->nullable(); $table->unsignedBigInteger('posted_by')->nullable(); $table->timestamp('voided_at')->nullable(); $table->unsignedBigInteger('voided_by')->nullable(); $table->string('void_reason')->nullable(); $table->timestamps(); $table->softDeletes();
         });
         Schema::create('purchase_return_items', function (Blueprint $table) {
             $table->id(); $table->unsignedBigInteger('merchant_id'); $table->unsignedBigInteger('purchase_return_id'); $table->unsignedBigInteger('goods_receipt_item_id'); $table->unsignedBigInteger('product_variant_id'); $table->unsignedBigInteger('unit_id'); $table->decimal('unit_quantity', 18, 4); $table->decimal('conversion_rate', 18, 6)->default(1); $table->decimal('base_quantity', 18, 4); $table->decimal('unit_price', 18, 4); $table->decimal('unit_cost', 18, 4); $table->decimal('subtotal', 18, 4)->default(0); $table->decimal('tax_rate', 5, 2)->default(0); $table->decimal('tax_amount', 18, 4)->default(0); $table->decimal('line_total', 18, 4)->default(0); $table->string('reason')->nullable(); $table->timestamps();

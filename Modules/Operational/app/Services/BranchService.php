@@ -43,8 +43,14 @@ class BranchService extends BaseService
             ],
             allowedFilters: [
                 AllowedFilter::exact('is_active'),
+                AllowedFilter::exact('region_id'),
             ],
-            with: ['region:id,name,code,type', 'mainWarehouse:id,name,code'],
+            with: [
+                'region',
+                'mainWarehouse:id,name,code',
+                'regency:kode,nama',
+                'province:kode,nama',
+            ],
             withCount: ['warehouses'],
             allowedSorts: ['name', 'code', 'warehouses_count', 'created_at'],
             searchableColumns: ['name', 'code', 'email', 'phone', 'postal_code'],
@@ -96,7 +102,7 @@ class BranchService extends BaseService
                 $warehouse->id ?? null,
             );
 
-            return $branch->load('warehouses');
+            return $branch->refresh()->load('warehouses');
         });
     }
 
@@ -158,7 +164,22 @@ class BranchService extends BaseService
             ->count();
 
         if ($valid !== count($ids)) {
-            throw ValidationException::withMessages(['warehouse_ids' => 'Satu atau lebih gudang tidak tersedia.']);
+            throw ValidationException::withMessages(['warehouse_ids' => 'Satu atau lebih gudang tidak tersedia atau tidak aktif.']);
+        }
+
+        // Gudang utama harus melayani regional cabang
+        if ($branch->region_id) {
+            $primaryServesRegion = DB::table('warehouse_regions')
+                ->where('merchant_id', $merchantId)
+                ->where('warehouse_id', $primaryId)
+                ->where('region_id', $branch->region_id)
+                ->exists();
+
+            if (! $primaryServesRegion) {
+                throw ValidationException::withMessages([
+                    'primary_warehouse_id' => 'Gudang utama cabang harus melayani regional tempat cabang ini berada.',
+                ]);
+            }
         }
 
         // Satu gudang memiliki satu pemilik cabang agar stok tidak ambigu.

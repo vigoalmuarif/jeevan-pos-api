@@ -14,11 +14,13 @@ use Modules\Core\Support\ServerSideTable;
 use Modules\Inventory\Enums\MutationType;
 use Modules\Inventory\Services\StockService;
 use Modules\Purchase\Enums\DocumentStatus;
+use Modules\Purchase\Enums\PaymentMethod;
 use Modules\Purchase\Enums\ReturnReason;
 use Modules\Purchase\Enums\SettlementMethod;
 use Modules\Purchase\Exceptions\PurchaseRuleException;
 use Modules\Purchase\Models\GoodsReceipt;
 use Modules\Purchase\Models\GoodsReceiptItem;
+use Modules\Purchase\Models\PurchaseInvoice;
 use Modules\Purchase\Models\PurchaseReturn;
 use Modules\Purchase\Models\PurchaseReturnItem;
 use Spatie\QueryBuilder\AllowedFilter;
@@ -36,6 +38,7 @@ class PurchaseReturnService
     public function __construct(
         private readonly PurchaseDocumentNumberService $numbers,
         private readonly StockService $stockService,
+        private readonly PurchasePaymentService $payments,
     ) {}
 
     public function getPaginated(Request $request): LengthAwarePaginator
@@ -194,9 +197,42 @@ class PurchaseReturnService
                 );
             }
 
-            // Jika settlement_method adalah potong faktur dan faktur sudah ada, hubungkan
+            // Jika settlement_method adalah potong faktur dan faktur sudah ada, hubungkan dan otomatis potong sisa hutang faktur
             if ($return->settlement_method === SettlementMethod::InvoiceDeduction && $receipt->purchase_invoice_id) {
                 $return->purchase_invoice_id = $receipt->purchase_invoice_id;
+
+                $invoice = PurchaseInvoice::query()
+                    ->where('id', $receipt->purchase_invoice_id)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($invoice && $invoice->status === DocumentStatus::Posted) {
+                    $balance = (string) $invoice->balance_amount;
+                    if (bccomp($balance, '0', 4) > 0) {
+                        $deductAmount = bccomp((string) $return->grand_total, $balance, 4) > 0
+                            ? $balance
+                            : (string) $return->grand_total;
+
+                        if (bccomp($deductAmount, '0', 4) > 0) {
+                            $payment = $this->payments->create(
+                                [
+                                    'supplier_id' => $return->supplier_id,
+                                    'payment_date' => $return->return_date?->toDateString() ?? today()->toDateString(),
+                                    'payment_method' => PaymentMethod::DebitNote->value,
+                                    'reference_number' => $return->document_number,
+                                    'notes' => "Pemotongan faktur dari Retur Pembelian {$return->document_number}",
+                                ],
+                                [
+                                    [
+                                        'purchase_invoice_id' => $invoice->id,
+                                        'amount' => $deductAmount,
+                                    ],
+                                ]
+                            );
+                            $return->purchase_payment_id = $payment->id;
+                        }
+                    }
+                }
             }
 
             $return->forceFill([
@@ -234,6 +270,15 @@ class PurchaseReturnService
                     notes: "Void Retur {$return->document_number}: {$reason}",
                     incomingUnitCost: (float) $item->unit_cost,
                 );
+            }
+
+            // Jika retur ini pernah memotong faktur (punya purchase_payment_id), batalkan alokasi pembayaran tersebut
+            if ($return->purchase_payment_id) {
+                $this->payments->void(
+                    $return->purchase_payment_id,
+                    "Pembatalan retur pembelian {$return->document_number}: {$reason}"
+                );
+                $return->purchase_payment_id = null;
             }
 
             $return->forceFill([

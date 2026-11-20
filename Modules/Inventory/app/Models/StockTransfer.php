@@ -19,7 +19,7 @@ class StockTransfer extends BaseModel
 {
     use BelongsToMerchant, HasAudit, SoftDeletes;
 
-    protected $fillable = ['document_number', 'from_warehouse_id', 'to_warehouse_id', 'transfer_date', 'notes'];
+    protected $fillable = ['document_number', 'stock_request_id', 'from_warehouse_id', 'to_warehouse_id', 'transfer_date', 'notes'];
 
     protected $attributes = ['status' => 'draft'];
 
@@ -32,6 +32,11 @@ class StockTransfer extends BaseModel
             'received_at' => 'datetime',
             'cancelled_at' => 'datetime',
         ];
+    }
+
+    public function stockRequest(): BelongsTo
+    {
+        return $this->belongsTo(StockRequest::class, 'stock_request_id');
     }
 
     public function fromWarehouse(): BelongsTo
