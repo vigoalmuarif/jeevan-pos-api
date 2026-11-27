@@ -42,6 +42,7 @@ class PurchaseInvoiceResource extends JsonResource
             'receipts',
             'items',
             'payments',
+            'returns',
         ]);
     }
 }

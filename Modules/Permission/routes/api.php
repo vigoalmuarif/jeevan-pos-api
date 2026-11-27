@@ -39,6 +39,7 @@ Route::middleware([
         [PermissionController::class, 'index']
     )->middleware('can:role.view');
 
+
     Route::post('permissions',
         [PermissionController::class, 'store']
     )->middleware('can:role.create');

@@ -58,6 +58,7 @@ class UpdateProductRequest extends BaseFormRequest
                     ->whereNull('deleted_at'),
             ],
             'track_stock' => ['sometimes', 'boolean'],
+            'can_be_sold' => ['sometimes', 'boolean'],
             'is_taxable' => ['sometimes', 'boolean'],
             'tax_rate' => ['sometimes', 'nullable', 'numeric', 'between:0,100'],
             'min_stock' => ['sometimes', 'nullable', 'numeric', 'min:0'],

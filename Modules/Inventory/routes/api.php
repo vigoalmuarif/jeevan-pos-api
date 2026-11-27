@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\InventoryController;
 use Modules\Inventory\Http\Controllers\StockAdjustmentController;
 use Modules\Inventory\Http\Controllers\StockMutationController;
+use Modules\Inventory\Http\Controllers\StockRequestController;
+use Modules\Inventory\Http\Controllers\StockTransferController;
 use Modules\Inventory\Http\Controllers\WarehouseStockController;
 
 Route::middleware([
@@ -45,6 +47,74 @@ Route::middleware([
         Route::post('/{stockAdjustment}/void', [StockAdjustmentController::class, 'void'])
             ->whereNumber('stockAdjustment')
             ->middleware('role_or_permission:owner|inventory.adjustment.approve');
+    });
+
+    Route::prefix('stock-transfers')->name('stock-transfers.')->group(function () {
+        Route::get('/options', [StockTransferController::class, 'options'])
+            ->middleware('role_or_permission:owner|inventory.transfer.view');
+        Route::get('/product-options', [StockTransferController::class, 'productOptions'])
+            ->middleware('role_or_permission:owner|inventory.transfer.view|inventory.transfer.create');
+        Route::get('/in-transit', [StockTransferController::class, 'inTransit'])
+            ->middleware('role_or_permission:owner|inventory.transfer.view|inventory.transfer.receive');
+        Route::get('/', [StockTransferController::class, 'index'])
+            ->middleware('role_or_permission:owner|inventory.transfer.view');
+        Route::get('/{stockTransfer}', [StockTransferController::class, 'show'])
+            ->whereNumber('stockTransfer')
+            ->middleware('role_or_permission:owner|inventory.transfer.view');
+        Route::post('/', [StockTransferController::class, 'store'])
+            ->middleware('role_or_permission:owner|inventory.transfer.create');
+        Route::patch('/{stockTransfer}', [StockTransferController::class, 'update'])
+            ->whereNumber('stockTransfer')
+            ->middleware('role_or_permission:owner|inventory.transfer.create');
+        Route::delete('/{stockTransfer}', [StockTransferController::class, 'destroy'])
+            ->whereNumber('stockTransfer')
+            ->middleware('role_or_permission:owner|inventory.transfer.create');
+        Route::post('/{stockTransfer}/ship', [StockTransferController::class, 'ship'])
+            ->whereNumber('stockTransfer')
+            ->middleware('role_or_permission:owner|inventory.transfer.ship');
+        Route::post('/{stockTransfer}/receive', [StockTransferController::class, 'receive'])
+            ->whereNumber('stockTransfer')
+            ->middleware('role_or_permission:owner|inventory.transfer.receive');
+        Route::post('/{stockTransfer}/cancel', [StockTransferController::class, 'cancel'])
+            ->whereNumber('stockTransfer')
+            ->middleware('role_or_permission:owner|inventory.transfer.cancel');
+    });
+
+    Route::prefix('stock-requests')->name('stock-requests.')->group(function () {
+        Route::get('/options', [StockRequestController::class, 'options'])
+            ->middleware('role_or_permission:owner|inventory.request.view|inventory.transfer.view|inventory.view');
+        Route::get('/product-options', [StockRequestController::class, 'productOptions'])
+            ->middleware('role_or_permission:owner|inventory.request.view|inventory.request.create|inventory.transfer.view');
+        Route::get('/low-stock-suggestions', [StockRequestController::class, 'lowStockSuggestions'])
+            ->middleware('role_or_permission:owner|inventory.request.view|inventory.request.create|inventory.transfer.view');
+        Route::get('/', [StockRequestController::class, 'index'])
+            ->middleware('role_or_permission:owner|inventory.request.view|inventory.transfer.view|inventory.view');
+        Route::get('/{stockRequest}', [StockRequestController::class, 'show'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.view|inventory.transfer.view|inventory.view');
+        Route::post('/', [StockRequestController::class, 'store'])
+            ->middleware('role_or_permission:owner|inventory.request.create|inventory.transfer.create');
+        Route::patch('/{stockRequest}', [StockRequestController::class, 'update'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.create|inventory.request.update|inventory.transfer.create');
+        Route::delete('/{stockRequest}', [StockRequestController::class, 'destroy'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.delete|inventory.transfer.delete|inventory.request.create');
+        Route::post('/{stockRequest}/submit', [StockRequestController::class, 'submit'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.create|inventory.request.update|inventory.transfer.create');
+        Route::post('/{stockRequest}/approve', [StockRequestController::class, 'approve'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.approve|inventory.transfer.approve');
+        Route::post('/{stockRequest}/reject', [StockRequestController::class, 'reject'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.approve|inventory.transfer.approve');
+        Route::post('/{stockRequest}/cancel', [StockRequestController::class, 'cancel'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.cancel|inventory.transfer.cancel|inventory.request.create');
+        Route::post('/{stockRequest}/convert-to-transfer', [StockRequestController::class, 'convertToTransfer'])
+            ->whereNumber('stockRequest')
+            ->middleware('role_or_permission:owner|inventory.request.approve|inventory.transfer.create|inventory.transfer.ship');
     });
 });
 

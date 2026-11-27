@@ -8,6 +8,32 @@ class WarehouseResource extends JsonResource
 {
     public function toArray($request): array
     {
+        $primaryBranch = null;
+        $firstBranch = null;
+
+        if ($this->relationLoaded('branches')) {
+            $primaryBranch = $this->branches->first(fn ($b) => (bool) $b->pivot?->is_primary);
+            $firstBranch = $this->branches->first();
+        }
+
+        $regionCount = $this->relationLoaded('regions') ? $this->regions->count() : 0;
+
+        if ($primaryBranch) {
+            $category = 'branch_primary';
+            $categoryLabel = 'Gudang Utama';
+        } elseif ($firstBranch) {
+            $category = 'branch_secondary';
+            $categoryLabel = 'Gudang Tambahan';
+        } elseif ($regionCount > 1) {
+            $category = 'central_multi_region';
+            $categoryLabel = 'Pusat Distribusi (Multi-Regional)';
+        } else {
+            $category = 'independent_regional';
+            $categoryLabel = 'Gudang Mandiri';
+        }
+
+        $assignedBranch = $primaryBranch ?? $firstBranch;
+
         return [
             'id'         => $this->id,
             'name'       => $this->name,
@@ -16,11 +42,13 @@ class WarehouseResource extends JsonResource
             'type'       => $this->type,
             'address'    => $this->address,
             'phone'      => $this->phone,
-            'is_main'    => $this->whenLoaded(
-                'branches',
-                fn () => $this->branches->contains(fn ($branch) => (bool) $branch->pivot?->is_primary),
-                false
-            ),
+            'category'   => $category,
+            'category_label' => $categoryLabel,
+            'branch_id'   => $assignedBranch?->id,
+            'branch_name' => $assignedBranch?->name,
+            'branch_code' => $assignedBranch?->code,
+            'is_main'    => (bool) $primaryBranch,
+            'is_primary' => (bool) $primaryBranch,
             'is_active'  => $this->is_active,
             'branches'   => $this->whenLoaded('branches', fn () => $this->branches->map(fn ($branch) => [
                 'id' => $branch->id,

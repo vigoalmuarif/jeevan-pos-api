@@ -20,7 +20,15 @@ class BranchResource extends JsonResource
             'is_main' => $this->is_main,
             'is_active' => $this->is_active,
             'region_id' => $this->region_id,
-            'region' => $this->whenLoaded('region'),
+            'primary_warehouse_id' => $this->primary_warehouse_id,
+            'region' => $this->whenLoaded('region', function () {
+                return $this->region ? [
+                    'id' => $this->region->id,
+                    'name' => $this->region->name,
+                    'code' => $this->region->code,
+                    'type' => $this->region->type,
+                ] : null;
+            }),
             'address' => [
                 'street' => $this->address,
                 'postal_code' => $this->postal_code,

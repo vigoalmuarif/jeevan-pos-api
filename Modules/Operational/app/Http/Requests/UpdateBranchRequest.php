@@ -60,6 +60,7 @@ class UpdateBranchRequest extends FormRequest
                     fn ($query) => $query->where('merchant_id', MerchantContext::id())->whereNull('deleted_at')
                 ),
             ],
+            'primary_warehouse_id' => ['nullable', 'integer'],
         ];
     }
 

@@ -376,7 +376,8 @@ class StockAdjustmentService
             $items = DB::table('stock_adjustment_items')
                 ->where('merchant_id', $merchantId)
                 ->where('stock_adjustment_id', $adjustment->id)
-                ->orderBy('id')
+                ->orderBy('product_variant_id', 'asc')
+                ->orderBy('id', 'asc')
                 ->get();
 
             if ($items->isEmpty()) {
@@ -428,7 +429,8 @@ class StockAdjustmentService
                 ->where('reference_type', 'stock_adjustment')
                 ->where('reference_id', $adjustment->id)
                 ->whereIn('mutation_type', ['stock_adjustment', 'opening_stock'])
-                ->orderBy('id')
+                ->orderBy('product_variant_id', 'asc')
+                ->orderBy('id', 'asc')
                 ->get();
 
             if ($mutations->isEmpty()) {

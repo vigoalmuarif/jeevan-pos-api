@@ -61,10 +61,14 @@ class AuthService extends BaseService
 
     public function logout(Request $request): void
     {
-        session()->forget('branch_id');
-        auth()->guard('merchant')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+        if ($request->hasSession()) {
+            session()->forget('branch_id');
+            auth()->guard('merchant')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        } else {
+            auth()->guard('merchant')->logout();
+        }
     }
 
     // -------------------------------------------------------

@@ -151,6 +151,7 @@ class AssortmentService
             ->where('p.merchant_id', $merchantId)
             ->where('p.type', 'product')
             ->where('p.is_active', true)
+            ->where('p.can_be_sold', true)
             ->where('pv.is_active', true)
             ->whereNull('p.deleted_at')
             ->whereNull('pv.deleted_at')
@@ -205,7 +206,7 @@ class AssortmentService
             ->where('bag.merchant_id', $merchantId)->where('bag.branch_id', $branchId)
             ->where('ag.merchant_id', $merchantId)->where('ag.is_active', true)->whereNull('ag.deleted_at')
             ->where('agp.merchant_id', $merchantId)->where('pv.merchant_id', $merchantId)->where('p.merchant_id', $merchantId)
-            ->where('pv.is_active', true)->where('p.is_active', true)->whereNull('pv.deleted_at')->whereNull('p.deleted_at')
+            ->where('pv.is_active', true)->where('p.is_active', true)->where('p.can_be_sold', true)->where('p.can_be_sold', true)->whereNull('pv.deleted_at')->whereNull('p.deleted_at')
             ->where(fn ($q) => $q->whereNull('bag.effective_from')->orWhereDate('bag.effective_from', '<=', $today))
             ->where(fn ($q) => $q->whereNull('bag.effective_until')->orWhereDate('bag.effective_until', '>=', $today))
             ->distinct()->pluck('pv.id')->map(fn ($id) => (int) $id)->all();
@@ -213,7 +214,7 @@ class AssortmentService
         $active = array_fill_keys($groupVariants, 'assortment');
         $eligibleVariants = DB::table('product_variants as pv')->join('products as p', 'p.id', '=', 'pv.product_id')
             ->where('pv.merchant_id', $merchantId)->where('p.merchant_id', $merchantId)
-            ->where('pv.is_active', true)->where('p.is_active', true)
+            ->where('pv.is_active', true)->where('p.is_active', true)->where('p.can_be_sold', true)
             ->whereNull('pv.deleted_at')->whereNull('p.deleted_at')->pluck('pv.id')->map(fn ($id) => (int) $id)->all();
         $overrides = DB::table('branch_product_overrides')->where('merchant_id', $merchantId)
             ->where('branch_id', $branchId)->where('is_active', true)->get();

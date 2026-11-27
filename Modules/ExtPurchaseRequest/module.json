@@ -1,0 +1,11 @@
+{
+    "name": "ExtPurchaseRequest",
+    "alias": "ext-purchase-request",
+    "description": "Optional Purchase Request module extending purchase workflows",
+    "keywords": ["purchase-request", "pr"],
+    "priority": 10,
+    "providers": [
+        "Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider"
+    ],
+    "files": []
+}

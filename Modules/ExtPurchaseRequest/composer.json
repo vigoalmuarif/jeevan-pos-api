@@ -1,0 +1,28 @@
+{
+    "name": "nwidart/ext-purchase-request",
+    "description": "Optional Purchase Request module for Jeevan POS",
+    "authors": [
+        {
+            "name": "Jeevan POS Team",
+            "email": "dev@jeevan.id"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\ExtPurchaseRequest\\": "app/",
+            "Modules\\ExtPurchaseRequest\\Database\\Factories\\": "database/factories/",
+            "Modules\\ExtPurchaseRequest\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\ExtPurchaseRequest\\Tests\\": "tests/"
+        }
+    }
+}

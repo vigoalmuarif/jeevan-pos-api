@@ -11,6 +11,7 @@ enum PaymentMethod: string
     case Cash = 'cash';
     case Transfer = 'transfer';
     case Giro = 'giro';
+    case DebitNote = 'debit_note';
     case Other = 'other';
 
     public function label(): string
@@ -19,6 +20,7 @@ enum PaymentMethod: string
             self::Cash => 'Tunai',
             self::Transfer => 'Transfer Bank',
             self::Giro => 'Giro / Cek',
+            self::DebitNote => 'Potong Retur (Debit Note)',
             self::Other => 'Lainnya',
         };
     }

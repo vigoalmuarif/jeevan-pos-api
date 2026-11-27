@@ -4,6 +4,7 @@ namespace Modules\Purchase\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Abstracts\BaseModel;
 use Modules\Core\Traits\BelongsToMerchant;
 use Modules\Product\Models\ProductVariant;
@@ -76,5 +77,10 @@ class PurchaseOrderItem extends BaseModel
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    public function requestLinks(): HasMany
+    {
+        return $this->hasMany(PurchaseRequestOrderLink::class, 'purchase_order_item_id');
     }
 }

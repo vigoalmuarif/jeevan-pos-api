@@ -34,6 +34,13 @@ class MerchantServiceProvider extends ModuleServiceProvider
         RouteServiceProvider::class,
     ];
 
+    public function register(): void
+    {
+        parent::register();
+
+        $this->app->singleton(\Modules\Merchant\Services\ModuleEntitlementService::class);
+    }
+
     /**
      * Define module schedules.
      * 

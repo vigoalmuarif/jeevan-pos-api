@@ -11,6 +11,7 @@ class WarehouseStockIndexRequest extends DataTableRequest
         return array_merge(parent::rules(), [
             'filter.branch_id' => ['sometimes', 'integer', 'min:1'],
             'filter.warehouse_id' => ['sometimes', 'integer', 'min:1'],
+            'filter.product_id' => ['sometimes', 'integer', 'min:1'],
         ]);
     }
 }

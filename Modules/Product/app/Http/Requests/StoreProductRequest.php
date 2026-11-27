@@ -32,6 +32,7 @@ class StoreProductRequest extends BaseFormRequest
                     ->whereNull('deleted_at'),
             ],
             'track_stock' => ['sometimes', 'boolean'],
+            'can_be_sold' => ['sometimes', 'boolean'],
             'is_taxable' => ['sometimes', 'boolean'],
             'tax_rate' => ['nullable', 'numeric', 'between:0,100'],
             'min_stock' => ['nullable', 'numeric', 'min:0'],

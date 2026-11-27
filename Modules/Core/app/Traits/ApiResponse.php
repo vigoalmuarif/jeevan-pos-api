@@ -21,10 +21,24 @@ trait ApiResponse
     protected function error(
         string $message = 'Error',
         int $code = 400,
-        mixed $errors = null
+        mixed $errors = null,
+        ?string $errorCode = null
     ): JsonResponse {
+        $defaultCode = match ($code) {
+            401 => 'UNAUTHENTICATED',
+            403 => 'FORBIDDEN',
+            404 => 'NOT_FOUND',
+            422 => 'VALIDATION_ERROR',
+            default => 'BAD_REQUEST',
+        };
+
         return response()->json([
             'success' => false,
+            'error' => [
+                'code' => $errorCode ?? $defaultCode,
+                'message' => $message,
+                'details' => $errors,
+            ],
             'message' => $message,
             'errors' => $errors,
         ], $code);

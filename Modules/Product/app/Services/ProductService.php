@@ -30,6 +30,7 @@ class ProductService
             allowedFilters: [
                 AllowedFilter::exact('type'),
                 AllowedFilter::exact('is_active'),
+                AllowedFilter::exact('can_be_sold'),
                 AllowedFilter::exact('brand_id'),
                 AllowedFilter::exact('track_stock'),
             ],
@@ -131,7 +132,7 @@ class ProductService
             if (array_key_exists('supplier_ids', $data)) {
                 $this->syncSuppliers($product, $data['supplier_ids'], $merchantId);
             }
-            if (array_key_exists('is_active', $data)) {
+            if (array_key_exists('is_active', $data) || array_key_exists('can_be_sold', $data)) {
                 $this->assortmentService->refreshVariants($product->variants()->pluck('id')->all());
             }
 
@@ -274,7 +275,7 @@ class ProductService
             ->with([
                 'brand:id,name',
                 'categories:id,name',
-                'suppliers:id,name',
+                'suppliers:id,code,name,contact_person,phone,email,address',
                 'images',
                 'unitConversions.unit:id,name,code',
                 'variants' => fn ($query) => $query->orderByDesc('is_default')->orderBy('id'),
@@ -286,7 +287,7 @@ class ProductService
 
     private function productAttributes(array $data): array
     {
-        $keys = ['type', 'name', 'description', 'brand_id', 'track_stock', 'is_taxable', 'tax_rate', 'min_stock', 'weight', 'is_active'];
+        $keys = ['type', 'name', 'description', 'brand_id', 'track_stock', 'can_be_sold', 'is_taxable', 'tax_rate', 'min_stock', 'weight', 'is_active'];
         $attributes = array_intersect_key($data, array_flip($keys));
         if (($data['type'] ?? null) === 'service' && ! array_key_exists('track_stock', $data)) {
             $attributes['track_stock'] = false;

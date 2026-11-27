@@ -108,9 +108,11 @@ Route::middleware([
 
 
         // Tab endpoints
-        Route::get('/{branch:slug}/operational', [BranchDetailController::class, 'operational']);
-        Route::get('/{branch:slug}/resources', [BranchDetailController::class, 'resources']);
-        Route::get('/{branch:slug}/snapshot', [BranchDetailController::class, 'snapshot']);
+        Route::middleware('role_or_permission:owner|core.branch.view')->group(function () {
+            Route::get('/{branch:slug}/operational', [BranchDetailController::class, 'operational']);
+            Route::get('/{branch:slug}/resources', [BranchDetailController::class, 'resources']);
+            Route::get('/{branch:slug}/snapshot', [BranchDetailController::class, 'snapshot']);
+        });
     });
 
 

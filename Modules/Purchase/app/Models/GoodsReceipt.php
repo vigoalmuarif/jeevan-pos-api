@@ -104,4 +104,9 @@ class GoodsReceipt extends BaseModel
     {
         return $this->hasMany(GoodsReceiptItem::class);
     }
+
+    public function purchaseReturns(): HasMany
+    {
+        return $this->hasMany(PurchaseReturn::class);
+    }
 }
