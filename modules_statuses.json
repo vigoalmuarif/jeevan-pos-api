@@ -9,5 +9,6 @@
     "Inventory": true,
     "Partner": true,
     "Purchase": true,
-    "ExtPurchaseRequest": true
+    "ExtPurchaseRequest": true,
+    "Sales": true
 }

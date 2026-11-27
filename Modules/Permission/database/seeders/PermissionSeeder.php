@@ -236,6 +236,15 @@ class PermissionSeeder extends Seeder
             ['group' => 'inventory', 'name' => 'inventory.threshold.update', 'module_code' => 'inventory', 'display_name' => 'Atur Stok Minimum'],
 
             // ------------------------------------------------
+            // Sales & POS
+            // ------------------------------------------------
+            ['group' => 'sales', 'name' => 'sales.pos.access',        'module_code' => 'sales', 'display_name' => 'Akses Kasir POS'],
+            ['group' => 'sales', 'name' => 'sales.shift.manage',      'module_code' => 'sales', 'display_name' => 'Kelola Shift Kasir'],
+            ['group' => 'sales', 'name' => 'sales.view',              'module_code' => 'sales', 'display_name' => 'Lihat Riwayat Penjualan'],
+            ['group' => 'sales', 'name' => 'sales.void',              'module_code' => 'sales', 'display_name' => 'Batalkan Transaksi Penjualan'],
+            ['group' => 'sales', 'name' => 'sales.discount.override', 'module_code' => 'sales', 'display_name' => 'Ubah Diskon POS'],
+
+            // ------------------------------------------------
             // Dashboard
             // ------------------------------------------------
             ['group' => 'dashboard', 'name' => 'core.dashboard.view', 'module_code' => 'dashboard', 'display_name' => 'Lihat Dashboard'],

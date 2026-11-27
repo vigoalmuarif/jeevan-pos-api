@@ -60,4 +60,13 @@ class Product extends BaseModel
             ->withPivot('merchant_id')
             ->withTimestamps();
     }
+
+    public function modifierGroups(): BelongsToMany
+    {
+        return $this->belongsToMany(ModifierGroup::class, 'product_modifier_groups')
+            ->withPivot(['merchant_id', 'sort_order'])
+            ->orderByPivot('sort_order')
+            ->orderBy('modifier_groups.sort_order')
+            ->withTimestamps();
+    }
 }

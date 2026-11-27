@@ -34,6 +34,24 @@ class ProductResource extends JsonResource
                 'email' => $supplier->email,
                 'address' => $supplier->address,
             ])),
+            'modifier_groups' => $this->whenLoaded('modifierGroups', fn () => $this->modifierGroups->map(fn ($group) => [
+                'id' => (int) $group->id,
+                'name' => (string) $group->name,
+                'selection_type' => (string) $group->selection_type,
+                'is_required' => (bool) $group->is_required,
+                'min_select' => (int) $group->min_select,
+                'max_select' => $group->max_select !== null ? (int) $group->max_select : null,
+                'is_active' => (bool) $group->is_active,
+                'options' => $group->relationLoaded('options')
+                    ? $group->options->map(fn ($opt) => [
+                        'id' => (int) $opt->id,
+                        'name' => (string) $opt->name,
+                        'price_adjustment' => (float) $opt->price_adjustment,
+                        'is_default' => (bool) $opt->is_default,
+                        'is_active' => (bool) $opt->is_active,
+                    ])->values()->all()
+                    : [],
+            ])->values()->all()),
             'track_stock' => (bool) $this->track_stock,
             'can_be_sold' => (bool) $this->can_be_sold,
             'is_taxable' => (bool) $this->is_taxable,

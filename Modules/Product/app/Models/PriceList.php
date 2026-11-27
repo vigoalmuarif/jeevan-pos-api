@@ -12,7 +12,12 @@ class PriceList extends BaseModel
 
     protected function casts(): array
     {
-        return ['is_default' => 'boolean', 'is_active' => 'boolean'];
+        return [
+            'default_markup_percent' => 'float',
+            'rounding_unit' => 'integer',
+            'is_default' => 'boolean',
+            'is_active' => 'boolean',
+        ];
     }
 
     public function prices(): HasMany

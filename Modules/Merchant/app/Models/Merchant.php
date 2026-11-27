@@ -54,7 +54,7 @@ class Merchant extends BaseModel
 
     public function primaryIndustryPackage(): BelongsTo
     {
-        return $this->belongsTo(IndustryPackage::class, 'industry_code', 'code');
+        return $this->belongsTo(IndustryPackage::class, 'industry_package_code', 'code');
     }
 
     public function merchantModules(): HasMany

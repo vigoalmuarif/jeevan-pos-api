@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
@@ -44,7 +45,12 @@ class ProductService
 
     public function find(int $id): Product
     {
-        return $this->baseQuery($this->requireMerchant())->findOrFail($id);
+        $product = $this->baseQuery($this->requireMerchant())->findOrFail($id);
+        if (Schema::hasTable('product_modifier_groups')) {
+            $product->load(['modifierGroups.options']);
+        }
+
+        return $product;
     }
 
     public function create(array $data): Product

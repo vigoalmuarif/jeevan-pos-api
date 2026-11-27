@@ -8,6 +8,7 @@ use Modules\Product\Http\Controllers\PriceListController;
 use Modules\Product\Http\Controllers\ProductPriceController;
 use Modules\Product\Http\Controllers\ProductVariantUnitController;
 use Modules\Product\Http\Controllers\AssortmentController;
+use Modules\Product\Http\Controllers\ModifierGroupController;
 use Modules\Product\Http\Controllers\UnitController;
 
 Route::middleware([
@@ -34,6 +35,8 @@ Route::middleware([
         Route::get('price-lists/{priceList}', [PriceListController::class, 'show'])->whereNumber('priceList')->middleware('role_or_permission:owner|product.view');
         Route::patch('price-lists/{priceList}', [PriceListController::class, 'update'])->whereNumber('priceList')->middleware('role_or_permission:owner|product.update');
         Route::delete('price-lists/{priceList}', [PriceListController::class, 'destroy'])->whereNumber('priceList')->middleware('role_or_permission:owner|product.delete');
+        Route::get('price-lists/{priceList}/items', [PriceListController::class, 'items'])->whereNumber('priceList')->middleware('role_or_permission:owner|product.view');
+        Route::put('price-lists/{priceList}/items', [PriceListController::class, 'bulkUpsertItems'])->whereNumber('priceList')->middleware('role_or_permission:owner|product.update');
         Route::get('variant-units/{variantUnit}/prices', [ProductPriceController::class, 'index'])->whereNumber('variantUnit')->middleware('role_or_permission:owner|product.view');
         Route::get('variant-units/{variantUnit}/resolved-price', [ProductPriceController::class, 'resolve'])->whereNumber('variantUnit')->middleware('role_or_permission:owner|product.view');
         Route::post('variant-units/{variantUnit}/prices', [ProductPriceController::class, 'store'])->whereNumber('variantUnit')->middleware('role_or_permission:owner|product.create');
@@ -50,6 +53,13 @@ Route::middleware([
         Route::delete('branches/{branch}/product-overrides/{variant}', [AssortmentController::class, 'removeOverride'])->whereNumber('branch')->whereNumber('variant')->middleware('role_or_permission:owner|product.update');
         Route::get('branches/{branch}/active-products', [AssortmentController::class, 'activeProducts'])->whereNumber('branch')->middleware('role_or_permission:owner|product.view');
         Route::get('branches/{branch}/product-availability', [AssortmentController::class, 'availability'])->whereNumber('branch')->middleware('role_or_permission:owner|product.view|product.update');
+
+        Route::get('modifier-groups', [ModifierGroupController::class, 'index'])->middleware('role_or_permission:owner|product.view');
+        Route::post('modifier-groups', [ModifierGroupController::class, 'store'])->middleware('role_or_permission:owner|product.create');
+        Route::get('modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'show'])->whereNumber('modifierGroup')->middleware('role_or_permission:owner|product.view');
+        Route::patch('modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'update'])->whereNumber('modifierGroup')->middleware('role_or_permission:owner|product.update');
+        Route::delete('modifier-groups/{modifierGroup}', [ModifierGroupController::class, 'destroy'])->whereNumber('modifierGroup')->middleware('role_or_permission:owner|product.delete');
+        Route::put('products/{product}/modifier-groups', [ModifierGroupController::class, 'syncProductGroups'])->whereNumber('product')->middleware('role_or_permission:owner|product.update');
 
         Route::name('products.')
             ->group(function() {

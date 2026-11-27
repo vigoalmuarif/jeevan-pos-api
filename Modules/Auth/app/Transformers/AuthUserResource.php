@@ -18,6 +18,8 @@ class AuthUserResource extends JsonResource
             'email' => $this->email,
             'avatar' => $this->avatar,
             'is_active' => $this->is_active,
+            'pos_pin_enabled' => (bool) $this->pos_pin_enabled,
+            'has_pos_pin' => filled($this->pos_pin),
         ];
     }
 }

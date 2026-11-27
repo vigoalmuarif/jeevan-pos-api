@@ -10,8 +10,9 @@
     6 => 'Modules\\Permission\\Providers\\PermissionServiceProvider',
     7 => 'Modules\\Product\\Providers\\ProductServiceProvider',
     8 => 'Modules\\Purchase\\Providers\\PurchaseServiceProvider',
-    9 => 'Modules\\User\\Providers\\UserServiceProvider',
-    10 => 'Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider',
+    9 => 'Modules\\Sales\\Providers\\SalesServiceProvider',
+    10 => 'Modules\\User\\Providers\\UserServiceProvider',
+    11 => 'Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider',
   ),
   'eager' => 
   array (
@@ -24,8 +25,9 @@
     6 => 'Modules\\Permission\\Providers\\PermissionServiceProvider',
     7 => 'Modules\\Product\\Providers\\ProductServiceProvider',
     8 => 'Modules\\Purchase\\Providers\\PurchaseServiceProvider',
-    9 => 'Modules\\User\\Providers\\UserServiceProvider',
-    10 => 'Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider',
+    9 => 'Modules\\Sales\\Providers\\SalesServiceProvider',
+    10 => 'Modules\\User\\Providers\\UserServiceProvider',
+    11 => 'Modules\\ExtPurchaseRequest\\Providers\\ExtPurchaseRequestServiceProvider',
   ),
   'deferred' => 
   array (

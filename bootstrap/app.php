@@ -43,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,
+            'pos.pin.unlocked' => \Modules\Sales\Http\Middleware\EnsurePosPinUnlocked::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

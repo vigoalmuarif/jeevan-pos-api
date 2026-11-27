@@ -2,13 +2,17 @@
 
 namespace Modules\Inventory\Enums;
 
-/** Jenis mutasi stok yang berasal dari dokumen penerimaan & retur pembelian barang. */
+/** Jenis mutasi stok yang berasal dari dokumen penerimaan, retur pembelian, dan penjualan. */
 enum MutationType: string
 {
     case PurchaseReceipt = 'purchase_receipt';
     case PurchaseReceiptVoid = 'purchase_receipt_void';
     case PurchaseReturn = 'purchase_return';
     case PurchaseReturnVoid = 'purchase_return_void';
+    case SalesOut = 'sales_out';
+    case SalesVoid = 'sales_void';
+    case SalesReturn = 'sales_return';
+    case SalesReturnVoid = 'sales_return_void';
 
     public function label(): string
     {
@@ -17,6 +21,10 @@ enum MutationType: string
             self::PurchaseReceiptVoid => 'Pembatalan Penerimaan Barang',
             self::PurchaseReturn => 'Retur Pembelian',
             self::PurchaseReturnVoid => 'Pembatalan Retur Pembelian',
+            self::SalesOut => 'Penjualan POS',
+            self::SalesVoid => 'Pembatalan Penjualan POS',
+            self::SalesReturn => 'Retur Penjualan',
+            self::SalesReturnVoid => 'Pembatalan Retur Penjualan',
         };
     }
 }

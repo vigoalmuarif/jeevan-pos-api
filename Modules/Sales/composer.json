@@ -1,0 +1,28 @@
+{
+    "name": "nwidart/sales",
+    "description": "Core POS and Sales module for Jeevan",
+    "authors": [
+        {
+            "name": "Jeevan POS Team",
+            "email": "dev@jeevan.id"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\Sales\\": "app/",
+            "Modules\\Sales\\Database\\Factories\\": "database/factories/",
+            "Modules\\Sales\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\Sales\\Tests\\": "tests/"
+        }
+    }
+}

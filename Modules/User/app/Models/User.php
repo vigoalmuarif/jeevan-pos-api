@@ -25,15 +25,18 @@ class User extends Authenticatable
 
     protected $hidden = [
         'password',
+        'pos_pin',
         'remember_token',
     ];
 
     protected $casts = [
         'email_verified_at' => 'datetime',
         'last_login_at' => 'datetime',
+        'pos_pin_updated_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
-        'is_all_branches' => 'boolean'
+        'is_all_branches' => 'boolean',
+        'pos_pin_enabled' => 'boolean',
     ];
 
     public function merchant(): BelongsTo
@@ -61,6 +64,11 @@ class User extends Authenticatable
     public function isActive(): bool
     {
         return $this->is_active === true;
+    }
+
+    public function hasPosPin(): bool
+    {
+        return filled($this->pos_pin);
     }
 
     public function canAccessBranch(int $branchId): bool

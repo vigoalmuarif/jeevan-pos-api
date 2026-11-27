@@ -14,6 +14,10 @@ class StorePriceListRequest extends BaseFormRequest
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('price_lists', 'name')->where('merchant_id', $merchantId)],
             'code' => ['nullable', 'string', 'max:255', Rule::unique('price_lists', 'code')->where('merchant_id', $merchantId)],
+            'default_markup_percent' => ['nullable', 'numeric', 'min:-99', 'max:1000'],
+            'rounding_unit' => ['nullable', 'integer', Rule::in([0, 100, 500, 1000])],
+            'rounding_mode' => ['nullable', 'string', Rule::in(['nearest', 'up', 'down'])],
+            'description' => ['nullable', 'string', 'max:255'],
             'is_default' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
         ];
